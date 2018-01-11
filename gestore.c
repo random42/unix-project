@@ -12,7 +12,14 @@
 #ifndef HEADER_H
 #include "header.h"
 #endif
+#ifndef SHM_H
+#include "shm.h"
+#endif
+#ifndef PEOPLE_H
+#include "people.h"
+#endif
 
+extern unsigned int errno;
 
 FILE* urandom;
 /*
@@ -20,147 +27,93 @@ FILE* urandom;
     utilizzato per leggere random bytes.
 */
 
-person** a_children; // Puntatore ai processi di tipo A
-person** b_children; // Puntatore ai processi di tipo B
+
+people* a_people; // Puntatore alla lista di processi attivi di tipo A
+people* b_people; // Puntatore alla lista di processi attivi di tipo B
 person* best_genoma;
 person* longest_name;
-person* shmptr;
+
 unsigned int total;
-int a_length;
-int b_length;
 char* a_path;
 char* b_path;
 time_t start_time;
 
 int shmid;
+void* shmptr;
+
 int msqid;
 
 
+/* Guess what */
+unsigned long mcd(unsigned long a, unsigned long b) {
+  unsigned long r;
+  while (a % b != 0) {
+    r = a%b;
+    a = b;
+    b = r;
+  }
+  return b;
+}
+
 /* Crea la memoria condivisa con i processi di tipo B */
 void shm_init() {
-  int flag = IPC_CREAT | IPC_EXCL | 0666;
-  if ((shmid = shmget(SHM_KEY,sizeof(person)*MAX_A+200*MAX_A,flag)) == -1) {
+  int flag = IPC_CREAT /* | IPC_EXCL */ | 0600;
+  int size = sizeof(unsigned int) + (sizeof(a_person) * SHM_LENGTH);
+  if ((shmid = shmget(SHM_KEY,size,flag)) == -1) {
     printf("Failed to create shared memory segment.\n");
-    exit(1);
+    exit(EXIT_FAILURE);
   }
-  if ((shmptr = shmat(shmid,NULL,0)) == (person*)-1) {
+  if ((shmptr = shmat(shmid,NULL,0)) == (void*)-1) {
     printf("Failed to attach shared memory segment.\n");
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 }
+
 
 /* Rimuove la memoria condivisa */
 void shm_destroy() {
   if (shmdt(shmptr) == -1) {
     printf("Failed to detach shared memory segment.\n");
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if (shmctl(shmid,IPC_RMID,NULL) == -1) {
     printf("Failed to remove shared memory segment.\n");
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 }
 
-/* Genera un tipo (A,B) random */
-type_t random_type() {
-  short num;
-  fread(&num, sizeof(short), 1, urandom);
-  return abs(num%2);
-}
-
-/* Stampa un array di persone arr di lunghezza length  */
-void print_people(person** arr,int length) {
-  printf("TIPO\tNOME\tGENOMA\tPID\n");
-  int i = 0;
-  while (i < length) {
-    printf("%s\t%s\t%lu\t%d\n",(arr[i]->tipo == 0 ? "A":"B"),arr[i]->nome,arr[i]->genoma,arr[i]->pid);
-    i++;
-  }
-}
 
 /* Stampa le info della simulazione */
 void print_info() {
-  printf("TEMPO\tTOTALI\tATTIVI\tA\tB\n");
-  printf("%d\t%d\t%d\t%d\t%d\n",(int)difftime(time(NULL),start_time),total,a_length+b_length,a_length,b_length);
+  //TODO
 }
 
-person* create_person(char* name, int mcd, int type) {
-  person* r = malloc(sizeof(person));
-  r->nome = malloc(strlen(name)+1);
-  strcpy(r->nome,name);
-  unsigned short n;
-  fread(&n,sizeof(unsigned short),1,urandom);
-  *(r->nome+strlen(name)) = (n % 26) + 65;
-  unsigned long gen;
-  fread(&gen,sizeof(unsigned long),1,urandom);
-  r->genoma = (gen % GENES) + mcd;
-  switch (type) {
-    case 0: {
-      r->tipo = A;
-      break;
+
+/* Sceglie il processo con genoma minimo */
+person* choose_victim() {
+  node* n = a_people->first;
+  person* p = n->elem;
+  unsigned long min = p->genoma;
+  for (int i = 0;i < a_people->length;i++) {
+    if (n->elem->genoma < min) {
+      p = n->elem;
+      min = p->genoma;
     }
-    case 1: {
-      r->tipo = B;
-      break;
-    }
-    default: {
-      r->tipo = random_type();
-      break;
-    }
+    n = n->next;
   }
-  return r;
-}
-
-/* Genera una struttura person random */
-person* create_rand_person() {
-  person* r = malloc(sizeof(person));
-  r->nome = malloc(1);
-  r->tipo = random_type();
-  unsigned long gen;
-  fread(&gen,sizeof(unsigned long),1,urandom);
-  r->genoma = (gen % GENES)+2;
-  unsigned short n;
-  fread(&n,sizeof(unsigned short),1,urandom);
-  *(r->nome) = (n % 26) + 65;
-  r->pid = 0;
-  return r;
-}
-
-/* Inizializza la memoria condivisa e apre il file urandom */
-void init() {
-  start_time = time(NULL);
-  urandom = fopen("/dev/urandom", "r");
-  msqid = msgget(MSG_KEY,IPC_CREAT | IPC_EXCL);
-  shm_init();
-  char* dir = getenv("PWD");
-  a_path = malloc(strlen(dir)+6);
-  b_path = malloc(strlen(dir)+6);
-  sprintf(a_path,"%s/bin/a",dir);
-  sprintf(b_path,"%s/bin/b",dir);
-  a_children = malloc(sizeof(person*)*);
-}
-
-
-// int birth_death() {
-//   choose_victim();
-//   if (victim.tipo == A) {
-//     rimuovi_dalla_memoria();
-//   }
-//   gen_child();
-//   print_info();
-// }
-
-/* Genera num persone random */
-person** create_people(int num) {
-  person** p = malloc(sizeof(person*)*num);
-  int i = 0;
-  while (i < num) {
-    p[i++] = create_rand_person();
+  n = b_people->first;
+  for (int i = 0;i < b_people->length;i++) {
+    if (n->elem->genoma < min) {
+      p = n->elem;
+      min = p->genoma;
+    }
+    n = n->next;
   }
   return p;
 }
 
-/* Riceve una struttura person crea un processo effettivo */
+
+/* Riceve una struttura person e crea un processo effettivo */
 void gen_child(person* p) {
   char* genoma = malloc(64);
   sprintf(genoma,"%lu",p->genoma);
@@ -168,7 +121,7 @@ void gen_child(person* p) {
   switch(child) {
     case -1: {
       printf("Failed forking.");
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     case 0: {
       if (p->tipo == A) {
@@ -180,23 +133,129 @@ void gen_child(person* p) {
       }
     }
     default: {
+      total++;
       p->pid = child;
-      print_people(&p,1);
+      // Aggiungo il nuovo processo alla rispettiva lista di persone
+      if (p->tipo == A) {
+        push_person(a_people,p);
+        // Aggiungo le informazioni nella memoria condivisa se il tipo e' A
+        shm_push(shmptr,p);
+      } else {
+        push_person(b_people,p);
+      }
     }
   }
 }
 
 
+/* Attende messaggi di accoppiamento */
+void wait_for_messages() {
+  //message m[2];
+  message r;
+  int size = sizeof(message)-sizeof(long);
+}
+
+
+/* Termina un processo e ne crea uno nuovo ogni BIRTH_DEATH secondi */
+void birth_death(int signum) {
+  // scelgo una vittima
+  person* victim = choose_victim();
+  pid_t pid = victim->pid;
+  if (victim->tipo == A) {
+    // rimuovo la persona dalla memoria condivisa
+    shm_pop(shmptr,pid);
+    // rimuovo la persona dalla lista di persone di quel tipo
+    pop_person(a_people,pid);
+  } else {
+    pop_person(b_people,pid);
+  }
+  // mando il segnale di terminazione al processo
+  if (kill(pid, SIGTERM) == -1) {
+    printf("Segnale di terminazione fallito!\n");
+    exit(EXIT_FAILURE);
+  }
+  person* new;
+  // Creo una nuova persona e ne forzo il tipo nel caso non ne esistano
+  if (a_people->length == 0) {
+    new = create_rand_person(A);
+  } else if (b_people->length == 0) {
+    new = create_rand_person(B);
+  } else {
+    new = create_rand_person(-1);
+  }
+  // Creo il processo della nuova persona
+  gen_child(new);
+  // Stampo le informazioni della simulazione
+  print_info();
+  // Resetto il segnale SIGALRM
+  alarm(BIRTH_DEATH);
+}
+
+
+/* Esegue una waitpid()*/
+void wait_pid(type_t type, pid_t pid) {
+  int status;
+  waitpid(pid,&status,0);
+  if (status != EXIT_SUCCESS) {
+    printf("%d did not exited with success.\n",pid);
+  } else {
+    printf("%d exited with success.\n",pid);
+  }
+}
+
+
+/* TODO */
 void quit() {
-  wait(NULL);
   shm_destroy();
   msgctl(msqid,IPC_RMID,NULL);
   fclose(urandom);
 }
 
 
+/* TODO */
+void init() {
+  // Definisce il tempo iniziale
+  start_time = time(NULL);
+  // Apre il file urandom
+  urandom = fopen("/dev/urandom", "r");
+  // Crea la coda di messaggi
+  if ((msqid = msgget(MSG_KEY,IPC_CREAT /* | IPC_EXCL */ | 0600)) == -1) {
+    printf("Failed to create message queue.\n");
+  }
+  // Inizializza la memoria condivisa
+  shm_init();
+  // Definisce i percorsi degli eseguibili
+  char* dir = getenv("PWD");
+  a_path = malloc(strlen(dir)+6);
+  b_path = malloc(strlen(dir)+6);
+  sprintf(a_path,"%s/bin/a",dir);
+  sprintf(b_path,"%s/bin/b",dir);
+  // Inizializza le liste di persone
+  a_people = init_people();
+  b_people = init_people();
+  // Utilizza la funzione birth_death come handler del segnale SIGALRM
+  // signal(SIGALRM,birth_death);
+}
+
+
+void set_random_pid(person* p) {
+  unsigned int pid;
+  fread(&pid,sizeof(unsigned int),1,urandom);
+  p->pid = pid%10000;
+}
+
 
 int main() {
-  // atexit(quit);
-  // init();
+  atexit(quit);
+  init();
+  for (int i = 0;i < 10;i++) {
+    person* p = create_rand_person(-1);
+    p->pid = i;
+    a_push(shmptr,p);
+  }
+  printf("Parent\n\n");
+  print_all_a(shmptr);
+  person* a = create_rand_person(B);
+  gen_child(a);
+  wait(NULL);
 }

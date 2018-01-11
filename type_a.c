@@ -3,30 +3,36 @@
 #include <unistd.h>
 #include <signal.h>
 #include <sys/msg.h>
+#include <string.h>
 #include "header.h"
 
-SIGTERM
 pid_t pid;
 unsigned long genoma;
 char* nome;
-int msgid;
+int msqid;
+int msgsize;
 message* received;
 int received_length;
 
-void init() {
-  pid = getpid();
-  msgid = msgget(MSG_KEY,0);
-  received = malloc(sizeof(message)*4096);
-  received_length = 0;
-  int i = 0;
-  while (i < 10) {
-    msgrcv(msgid,received[received_length++],1,pid,0);
-    printf("Received genoma %lu, pid %d",received[i].genoma,received[i].pid);
-    i++;
+unsigned long mcd(unsigned long a, unsigned long b) {
+  unsigned long r;
+  while (a % b != 0) {
+    r = a%b;
+    a = b;
+    b = r;
   }
+  return b;
 }
 
-quit() {
+void ascolta() {}
+
+void init() {
+  pid = getpid();
+  msqid = msgget(MSG_KEY,0);
+  msgsize = sizeof(message)-sizeof(long);
+}
+
+void quit() {
 
 }
 
@@ -34,4 +40,5 @@ int main(int argc, char* argv[]) {
   nome = argv[1];
   genoma = strtoul(argv[2],NULL,10);
   init();
+  signal(SIGTERM,quit);
 }
