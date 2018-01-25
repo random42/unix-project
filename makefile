@@ -11,6 +11,6 @@ a: type_a.o
 b: type_b.o shm.o
 	${CC} -o ${BIN}$@ ${BUILD}type_b.o ${BUILD}shm.o
 %.o:	%.c
-	${CC} -c $*.c -o ${BUILD}$@
+	${CC} -g -c $*.c -o ${BUILD}$@
 clean:
 	rm -f ${BIN}* ${BUILD}*

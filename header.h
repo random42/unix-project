@@ -1,33 +1,21 @@
 #define HEADER_H
-#define BIRTH_DEATH 10
-#define SIM_TIME 50
-#define GENES 30
-#define INIT_PEOPLE 20
-#define MSG_KEY 9999
-#define MAX_A 2048
-#define MAX_NAME 256
-#define SHM_LENGTH 4096
-#define SHM_KEY 1234
-
-typedef enum {A,B} type_t;
-
-typedef struct {
-  type_t tipo;
-  unsigned long genoma;
-  char nome[MAX_NAME];
-  pid_t pid;
-} person;
+#define BIRTH_DEATH 4
+#define SIM_TIME 20
+#define GENES 50
+#define INIT_PEOPLE 40
+#define MSG_MATCH 9999
+#define MSG_START 9998
+#define print_error() printf("%s\n",strerror(errno))
 
 
 typedef struct {
-  unsigned long genoma;
-  pid_t pid;
-  char valid;
-} a_person;
-
-
-typedef struct {
-    long mtype; // pid del processo ricevente
+    long mtype;
+    /* pid del ricevente eccetto
+    B -> Gestore: pid di B
+    questo e' per ricevere sempre i messaggi della coppia insieme
+    */
+    unsigned int id;
+    // id del processo B tra B -> A
     char data;
     /* Questo campo ha diversi significati a seconda
     di chi manda e chi riceve il messaggio:
@@ -35,21 +23,10 @@ typedef struct {
     A -> B: 0 per rifiuto, 1 per consenso
     A||B -> Gestore: 0 se il mittente e' di tipo B, 1 se di tipo A
     */
-    unsigned long genoma; // usato solo tra processi A e B per comunicare il proprio genoma
+    unsigned long genoma;
+    // usato solo tra processi A e B per comunicare il proprio genoma
     pid_t pid;
-    /* Anche qua, se il messaggio avviene tra processi A e B
-    e' il genoma del mittente,
-    se avviene da A||B al Gestore e' il genoma del processo accoppiato */
+    // PID del mittente
+    pid_t partner;
+    // PID del parter, usato quando due processi si accoppiano e comunicano al gestore
 } message;
-
-
-typedef struct nodo {
-  person* elem;
-  struct nodo* next;
-} node;
-
-
-typedef struct {
-  node* first;
-  int length;
-} people;

@@ -23,19 +23,23 @@ L'argomento type puo' forzare la scelta del tipo
 type == 0 -> A
 type == 1 -> B
 default -> random */
-person* create_person(char* name, int mcd, int type) {
+person* create_person(char* name, unsigned long mcd, int type) {
+  int name_length = strlen(name)+1;
+  // alloca la memoria per la nuova persona
   person* r = malloc(sizeof(person));
-  if (strlen(name) > MAX_NAME-2) {
-    printf("Reached maximum name length.\nExiting...\n");
-    exit(EXIT_FAILURE);
-  }
+  r->nome = malloc(name_length+1);
+  // copia il nome del genitore
   strcpy(r->nome,name);
   unsigned short n;
   fread(&n,sizeof(unsigned short),1,urandom);
-  r->nome[strlen(name)] = (n % 26) + 65;
+  // inserisce una nuova lettera random nel nome
+  r->nome[name_length-1] = (n % 26) + 65;
+  r->nome[name_length] = '\0';
   unsigned long gen;
   fread(&gen,sizeof(unsigned long),1,urandom);
-  r->genoma = (gen % GENES) + mcd;
+  // genera il genoma
+  r->genoma = (gen % GENES+1) + mcd;
+  // definisce il tipo
   r->tipo = (type == A || type == B) ? type : random_type();
   return r;
 }
@@ -45,13 +49,15 @@ person* create_person(char* name, int mcd, int type) {
 L'argomento type funziona come in create_person */
 person* create_rand_person(int type) {
   person* r = malloc(sizeof(person));
+  r->nome = malloc(2);
   r->tipo = (type == A || type == B) ? type : random_type();
   unsigned long gen;
   fread(&gen,sizeof(unsigned long),1,urandom);
-  r->genoma = (gen % GENES)+2;
+  r->genoma = (gen % GENES+1)+2;
   unsigned short n;
   fread(&n,sizeof(unsigned short),1,urandom);
   *(r->nome) = (n % 26) + 65;
+  r->nome[1] = '\0';
   r->pid = 0;
   return r;
 }
@@ -81,13 +87,13 @@ void people_for_each(people* arr, void (*f)(person*)) {
 
 /* Stampa le informazioni di una persona */
 void print_person(person* p) {
-  printf("%s\t%s\t%lu\t%d\n",(p->tipo == 0 ? "A":"B"),p->nome,p->genoma,p->pid);
+  printf("%d\t%s\t%lu\t%d\n",p->id,(p->tipo == 0 ? "A":"B"),p->genoma,p->pid);
 }
 
 
 /* Stampa le informazioni di una lista di persone */
 void print_people(people* arr) {
-  printf("TIPO\tNOME\tGENOMA\tPID\n\n");
+  printf("ID\tTIPO\tGENOMA\tPID\n\n");
   people_for_each(arr,print_person);
   printf("\n");
 }
@@ -104,6 +110,7 @@ person* get_person(people* l, pid_t pid) {
       p = n->elem;
       found = 1;
     }
+    n = n->next;
     i++;
   }
   return p;
@@ -134,7 +141,6 @@ void pop_person(people* l, pid_t pid) {
       } else {
         prev->next = n->next;
       }
-      free(n->elem);
       free(n);
       l->length--;
     }
@@ -147,17 +153,23 @@ void pop_person(people* l, pid_t pid) {
 }
 
 
-/* Libera la memoria di tutta la lista */
+/* Libera la memoria della lista */
 void delete_people(people* l) {
   node* n = l->first;
   node* next = n->next;
   for (int i = 0;i < l->length;i++) {
-    free(n->elem);
+    delete_person(n->elem);
     free(n);
     n = next;
     next = n->next;
   }
   free(l);
+}
+
+/* Libera la memoria della persona */
+void delete_person(person* p) {
+  free(p->nome);
+  free(p);
 }
 
 
@@ -180,5 +192,34 @@ people* join(people* a, people* b) {
   }
   n->next = b->first;
   r->length = a->length+b->length;
+  return r;
+}
+
+
+person* get_longest_name(people* arr) {
+  node* n = arr->first;
+  person* r = n->elem;
+  char* nome = r->nome;
+  for (int i = 0; i < arr->length;i++) {
+    if (strlen(n->elem->nome) > strlen(nome)) {
+      nome = n->elem->nome;
+      r = n->elem;
+    }
+    n = n->next;
+  }
+  return r;
+}
+
+person* get_greatest_genoma(people* arr) {
+  node* n = arr->first;
+  person* r = n->elem;
+  unsigned long gen = r->genoma;
+  for (int i = 0; i < arr->length;i++) {
+    if (n->elem->genoma > gen) {
+      gen = n->elem->genoma;
+      r = n->elem;
+    }
+    n = n->next;
+  }
   return r;
 }
