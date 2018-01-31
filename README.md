@@ -6,12 +6,19 @@ Authors: Roberto Sero, Gianmarco Sciortino
 ## Come eseguire
 
 Clonare il progetto:
+
 `$ git clone https://github.com/robertosero/unix-project`
+
 Compilare:
+
 `$ cd unix-project`
+
 `$ make all`
+
 Eseguire /bin/gestore:
+
 `$ ./bin/gestore`
+
 *Importante!* Eseguire il gestore sempre dalla root directory, non navigare in bin! 
 
 
