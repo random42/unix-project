@@ -8,10 +8,13 @@
 #include "people.h"
 #endif
 
+extern char* debug_func;
+extern int debug_info;
 extern FILE* urandom;
 
 /* Genera un tipo (A,B) random */
 type_t random_type() {
+  debug_func("random_type");
   short num;
   fread(&num, sizeof(short), 1, urandom);
   return abs(num%2);
@@ -24,6 +27,7 @@ type == 0 -> A
 type == 1 -> B
 default -> random */
 person* create_person(char* name, unsigned long mcd, int type) {
+  debug_func("create_person");
   int name_length = strlen(name)+1;
   // alloca la memoria per la nuova persona
   person* r = malloc(sizeof(person));
@@ -48,6 +52,7 @@ person* create_person(char* name, unsigned long mcd, int type) {
 /* Genera una struttura person random
 L'argomento type funziona come in create_person */
 person* create_rand_person(int type) {
+  debug_func("create_rand_person");
   person* r = malloc(sizeof(person));
   r->nome = malloc(2);
   r->tipo = (type == A || type == B) ? type : random_type();
@@ -65,6 +70,7 @@ person* create_rand_person(int type) {
 
 /* Genera num persone random */
 people* create_people(int num) {
+  debug_func("create_people");
   people* p = init_people();
   int i = 0;
   while (i < num) {
@@ -101,6 +107,8 @@ void print_people(people* arr) {
 
 /* Cerca una persona tramite pid, ritorna NULL se non esiste */
 person* get_person(people* l, pid_t pid) {
+  debug_func("get_person");
+  debug_info = pid;
   int i = 0;
   node* n = l->first;
   int found = 0;
@@ -119,6 +127,7 @@ person* get_person(people* l, pid_t pid) {
 
 /* Inserisce una persona all'inizio della lista */
 void push_person(people* l, person* p) {
+  debug_func("push_person");
   node* n = malloc(sizeof(node));
   n->next = l->first;
   l->first = n;
@@ -129,6 +138,7 @@ void push_person(people* l, person* p) {
 
 /* Toglie la persona con il pid specificato dalla lista */
 void pop_person(people* l, pid_t pid) {
+  debug_func("pop_person");
   node* n = l->first;
   node* prev = NULL;
   int i = 0;
@@ -155,6 +165,7 @@ void pop_person(people* l, pid_t pid) {
 
 /* Libera la memoria della lista */
 void delete_people(people* l) {
+  debug_func("delete_people");
   node* n = l->first;
   node* next = n->next;
   for (int i = 0;i < l->length;i++) {
@@ -168,6 +179,7 @@ void delete_people(people* l) {
 
 /* Libera la memoria della persona */
 void delete_person(person* p) {
+  debug_func("delete_person");
   free(p->nome);
   free(p);
 }
@@ -175,15 +187,16 @@ void delete_person(person* p) {
 
 /* Alloca la memoria per la lista */
 people* init_people() {
+  debug_func("init_people");
   people* a = malloc(sizeof(people));
   a->first = NULL;
   a->length = 0;
   return a;
 }
 
-
 /* Unisce due liste */
 people* join(people* a, people* b) {
+  debug_func("join");
   people* r = init_people();
   r->first = a->first;
   node* n = r->first;
@@ -197,6 +210,7 @@ people* join(people* a, people* b) {
 
 
 person* get_longest_name(people* arr) {
+  debug_func("get_longest_name");
   node* n = arr->first;
   person* r = n->elem;
   char* nome = r->nome;
@@ -211,6 +225,7 @@ person* get_longest_name(people* arr) {
 }
 
 person* get_greatest_genoma(people* arr) {
+  debug_func("get_greatest_genoma");
   node* n = arr->first;
   person* r = n->elem;
   unsigned long gen = r->genoma;
