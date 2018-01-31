@@ -15,10 +15,7 @@
 #endif
 
 FILE* urandom;
-/*
-    File contenuto in /dev/urandom
-    utilizzato per leggere random bytes.
-*/
+// File contenuto in /dev/urandom utilizzato per leggere random bytes.
 
 
 people* a_people; // Puntatore alla lista di processi attivi di tipo A
@@ -26,15 +23,22 @@ people* b_people; // Puntatore alla lista di processi attivi di tipo B
 person* best_genoma;
 person* longest_name;
 
+// pid dei processi in fase di accoppiamento
 pid_t a_matching;
 pid_t b_matching;
+
+// messaggi di matching da parte di A e B
+message a_mess;
+message b_mess;
 
 // Persone totali create
 unsigned int total;
 // Accoppiamenti totali
 unsigned int matches;
+// Percorsi agli eseguibili di A e B
 char* a_path;
 char* b_path;
+// Tempo iniziale
 struct timeval start_time;
 
 int shmid;
@@ -42,8 +46,11 @@ void* shmptr;
 
 int msq_match;
 int msq_start;
+int msq_contact;
 int msgsize;
 
+char* debug_func;
+int debug_info;
 
 
 /* Guess what */
@@ -60,13 +67,15 @@ unsigned long mcd(unsigned long a, unsigned long b) {
 /* Crea la memoria condivisa con i processi di tipo B */
 void shm_init() {
   int flag = IPC_CREAT /* | IPC_EXCL */ | 0600;
-  int shm_size = sizeof(int) + (sizeof(a_person) * SHM_LENGTH);
+  int shm_size = sizeof(int) + (sizeof(a_person) * INIT_PEOPLE);
   if ((shmid = shmget(SHM_KEY,shm_size,flag)) == -1) {
     printf("Failed to create shared memory segment.\n");
+    print_error();
     raise(SIGTERM);
   }
   if ((shmptr = shmat(shmid,NULL,0)) == (void*)-1) {
     printf("Failed to attach shared memory segment.\n");
+    print_error();
     raise(SIGTERM);
   }
 }
@@ -85,9 +94,23 @@ void shm_destroy() {
 }
 
 
-/* Stampa il tempo trascorso dall'inizio della simulazione
+/* Crea le code di messaggi */
+void msq_init() {
+  if ((msq_match = msgget(MSG_MATCH,IPC_CREAT /* | IPC_EXCL */ | 0600)) == -1) {
+    printf("Failed to create message queue.\n");
+  }
+  if ((msq_start = msgget(MSG_START,IPC_CREAT /* | IPC_EXCL */ | 0600)) == -1) {
+    printf("Failed to create message queue.\n");
+  }
+  if ((msq_contact = msgget(MSG_CONTACT,IPC_CREAT /* | IPC_EXCL */ | 0600)) == -1) {
+    printf("Failed to create message queue.\n");
+  }
+}
+
+
+/* Ritorna il tempo trascorso dall'inizio della simulazione
 con una precisione di microsecondi */
-void print_time() {
+double elapsed_time() {
   double start = start_time.tv_sec+((double)start_time.tv_usec/1e6);
   double now;
   struct timeval x;
@@ -95,21 +118,24 @@ void print_time() {
   unsigned int seconds = x.tv_sec;
   unsigned int microseconds = x.tv_usec;
   now = seconds+((double)microseconds/1e6);
-  printf("Tempo trascorso: %lf sec\n",now-start);
+  return now-start;
 }
 
 
 /* Stampa le info della simulazione */
 void print_info(int sig) {
-  printf("\n\n###  TIPO A  ###\n\n");
-  print_people(a_people);
-  printf("###  TIPO B  ###\n\n");
-  print_people(b_people);
+  //debug_func("print_info");
+  double _time = elapsed_time();
+  //printf("\n\n###  TIPO A  ###\n\n");
+  //print_people(a_people);
+  //printf("###  TIPO B  ###\n\n");
+  //print_people(b_people);
   printf("Individui totali creati: %u\n",total);
   printf("Accoppiamenti: %u\n",matches);
-  print_time();
+  printf("Tempo trascorso: %lf sec\n",_time);
+  printf("Accoppiamenti/secondo: %.3lf\n",matches/_time);
   printf("\n\n");
-  alarm(15);
+  alarm(2);
 }
 
 
@@ -117,6 +143,7 @@ void print_info(int sig) {
 speciale in cui gli individui esistenti siano 2 e si stanno
 accoppiando */
 person* choose_victim() {
+  debug_func("choose_victim");
   node* n = a_people->first;
   person* p = n->elem;
   unsigned long min = p->genoma;
@@ -149,6 +176,7 @@ altrimenti avra' le caratteristiche iniziali. La funzione provvede
 a non estinguere nessuno dei due tipi.
 */
 person* spawn_new_person(char* nome, unsigned long mcd) {
+  debug_func("spawn_new_person");
   person* p;
   int type;
   // forza il tipo se necessario
@@ -178,6 +206,7 @@ person* spawn_new_person(char* nome, unsigned long mcd) {
 /* Riceve una struttura person, crea un processo effettivo
 e aggiunge la persona nella memoria condivisa se e' di tipo A */
 void gen_child(person* p) {
+  debug_func("gen_child");
   // scrivo genoma e id in una stringa da passare come argomento dell'execl
   char* genoma = malloc(64);
   sprintf(genoma,"%lu",p->genoma);
@@ -217,6 +246,7 @@ void gen_child(person* p) {
 /* Riceve i pid dei processi accoppiati, pulisce le loro strutture e
 crea gli individui figli */
 void accoppia(int a, int b) {
+  debug_func("accoppia");
   // aumenta il numero di accoppiamenti totali
   matches++;
   // toglie A dalla memoria condivisa
@@ -224,12 +254,11 @@ void accoppia(int a, int b) {
   // esegue le wait
   waitpid(a,NULL,0);
   waitpid(b,NULL,0);
-  // svuota i messaggi
-  empty_queue(a,A);
-  empty_queue(b,B);
   // prende le persone dalla lista
   person* old_a = get_person(a_people,a);
   person* old_b = get_person(b_people,b);
+  //print_person(old_a);
+  //print_person(old_b);
   unsigned long mcd_v = mcd(old_a->genoma,old_b->genoma);
   // le rimuove dalla lista
   pop_person(a_people,a);
@@ -243,102 +272,105 @@ void accoppia(int a, int b) {
   // libera la memoria delle persone terminate
   delete_person(old_a);
   delete_person(old_b);
+  // svuota i messaggi
+  empty_queue(a,A);
+  empty_queue(b,B);
   // Segnala di iniziare il ciclo di vita
   segnala_start(new_1);
   segnala_start(new_2);
   // resetta le variabili di matching
   a_matching = 0;
   b_matching = 0;
-  printf("Match A: %d\tB: %d\n",a,b);
 }
 
 
-/* Svuota la coda di messaggi di un processo terminato.
+/* Svuota i messaggi contact di un processo terminato.
 Se di tipo A, rifiuta tutte le richieste pendenti
 */
 void empty_queue(pid_t pid, int type) {
+  debug_func("empty_queue");
+  // messaggio ricevuto
+  message r;
+  // messaggio da inviare
+  message s;
+  s.data = 0;
+  s.pid = pid;
+  int status;
   if (type == A) {
-    message r;
-    message s;
-    errno = 0;
-    int i = 0;
-    while (msgrcv(msq_match,&r,msgsize,pid,IPC_NOWAIT) != -1  || errno == EINTR) {
-      if (i > 1000) {
-        printf("empty_queue bug type A\n");
-        break;
-      }
-      // rifiuta le richieste pendenti
-      s.data = 0;
+    while ((status = msgrcv(msq_contact,&r,msgsize,pid,IPC_NOWAIT)) != -1 || (status == -1 && errno == EINTR)) {
+      if (status == -1) continue;
+      // setta l'mtype per rispondere al processo B
       s.mtype = r.pid;
-      s.pid = pid;
-      while (msgsnd(msq_match,&s,msgsize,0) == -1 && errno == EINTR) continue;
-      i++;
+      // rifiuta le richieste pendenti
+      while (msgsnd(msq_contact,&s,msgsize,0) == -1 && errno == EINTR) continue;
     }
   } else {
-    errno = 0;
-    while (msgrcv(msq_match,NULL,msgsize,pid,IPC_NOWAIT) != -1 || errno == EINTR) continue;
+    while (msgrcv(msq_contact,&r,msgsize,pid,IPC_NOWAIT) != -1 || errno == EINTR) continue;
   }
 
 }
 
+
 void print_message(message* m) {
-  printf("Pid: %d\tmtype: %lu\tpartner: %d\n\n",m->pid,m->mtype,m->partner);
+  printf("Pid: %d\tmtype: %lu\tpartner: %d\tdata: %d\n",m->pid,m->mtype,m->partner,m->data);
 }
 
 
 /* Attende messaggi di accoppiamento. Vengono usati i while nel caso
 in cui un segnale blocchi la ricezione del messaggio */
 void wait_for_messages() {
-  message a;
-  message b;
+  int max_match = 1000;
+  int i = 0;
   while (1) {
+    debug_func("wait_for_messages");
+    debug_info = -1;
     // Riceve il messaggio di un processo A
-    errno = 0;
-    while (msgrcv(msq_match,&a,msgsize,getpid(),0) == -1 && errno == EINTR) continue;
-    // Segnala a birth_death che i processi sono in fase di matching
-    a_matching = a.pid;
-    b_matching = a.partner;
-    // Da' tempo al messaggio di B di arrivare
-    usleep(5000);
+    while (msgrcv(msq_match,&a_mess,msgsize,getpid(),0) == -1 && errno == EINTR) continue;
+    // Segnala a_mess birth_death che i processi sono in fase di matching
+    a_matching = a_mess.pid;
+    b_matching = a_mess.partner;
+    debug_info = 1;
     // Riceve il messaggio del processo B con IPC_NOWAIT
+    debug_info = 2;
     errno = 0;
-    while (msgrcv(msq_match,&b,msgsize,a.partner,IPC_NOWAIT) == -1 && errno == EINTR) {
+    while (msgrcv(msq_match,&b_mess,msgsize,a_mess.partner,IPC_NOWAIT) == -1 && errno == EINTR) {
       errno = 0;
     }
-    switch (errno) {
-      case 0: { // Il messaggio e' stato ricevuto
-        // controlla che i processi siano ancora vivi
-        if (kill(a.pid,0) + kill(b.pid,0) < 0) { // uno e' terminato
-          // Uno dei due processi e' stato ucciso da birth_death
-          // prima della ricezione del messaggio di A
-          // Restarta il processo in pausa.
-          kill(a.pid,SIGUSR1);
-          kill(b.pid,SIGUSR1);
-        } else {  // sono entrambi vivi
-          // segnala ai processi di terminare
-          kill(b.pid,SIGTERM);
-          kill(a.pid,SIGTERM);
-          accoppia(a.pid,b.pid);
-        }
-        break;
-      } case ENOMSG: {
-        // Il processo B e' terminato prima di sapere del consenso di A
-        // segnala al processo A di continuare
-        print_error();
-        kill(a.pid,SIGUSR1);
-        break;
-      } default: {
-        print_error();
-        raise(SIGTERM);
-        break;
-      }
+    // Il messaggio e' stato ricevuto
+    //controlla la validita' dei messaggi
+    debug_info = 3;
+    if (a_mess.pid != b_mess.partner || b_mess.pid != a_mess.partner) {
+      debug(0);
     }
+    // controlla che i processi siano ancora vivi
+    if (kill(a_mess.pid,0) + kill(b_mess.pid,0) < 0) { // uno e' terminato
+      // Uno dei due processi e' stato ucciso da birth_death
+      // prima della ricezione del messaggio di A
+      // Restarta il processo in pausa.
+      printf("Uno dei processi e' terminato\n");
+      kill(a_mess.pid,SIGUSR1);
+      kill(b_mess.pid,SIGUSR1);
+      a_matching = 0;
+      b_matching = 0;
+      debug_info = 4;
+    } else {  // sono entrambi vivi
+      // segnala ai processi di terminare
+      kill(b_mess.pid,SIGTERM);
+      kill(a_mess.pid,SIGTERM);
+      debug_info = 5;
+      // li accoppia
+      accoppia(a_mess.pid,a_mess.partner);
+      debug_info = 6;
+    }
+    i++;
   }
+  debug(0);
 }
 
 
 /* Termina un processo e ne crea uno nuovo ogni BIRTH_DEATH secondi */
 void birth_death(int sig) {
+  debug_func("birth_death");
   if (a_people->length+b_people->length == 2) {
     printf("Birth Death not possible!\n");
     return;
@@ -385,13 +417,11 @@ void birth_death(int sig) {
 
 /* Uccide tutti i processi figli e esegue le wait su di essi */
 void kill_all() {
+  debug_func("kill_all");
   people_for_each(a_people,kill_person);
   people_for_each(a_people,kill_person);
-  while (wait(NULL) != -1) continue;
-  if (errno != ECHILD) {// errore inatteso
-    printf("kill_all error\n");
-    print_error();
-  }
+  errno = 0;
+  while (wait(NULL) == 0 || errno == EINTR) continue;
 }
 
 
@@ -403,6 +433,7 @@ void kill_person(person* p) {
 
 /* Manda il segnale di start alla persona p */
 void segnala_start(person* p) {
+  debug_func("segnala_start");
   if (kill(p->pid,SIGUSR1) == -1) {
     printf("segnala_start error\n");
     print_error();
@@ -412,10 +443,46 @@ void segnala_start(person* p) {
 
 /* Riceve il messaggio di pronto della persona p */
 void ready_receive(person* p) {
-  message m;
-  if (msgrcv(msq_start,&m,msgsize,p->pid,0) == -1 && errno != EINTR) {
-    print_error();
-    raise(SIGTERM);
+  debug_func("ready_receive");
+  message x;
+  while (msgrcv(msq_start,&x,msgsize,p->pid,0) == -1 && errno == EINTR) continue;
+}
+
+void debug(int sig) {
+  print_people(a_people);
+  print_people(b_people);
+  printf("Matching: %d,%d\n",a_matching,b_matching);
+  print_message(&a_mess);
+  print_message(&b_mess);
+  printf("Function: %s\n",debug_func);
+  printf("Info: %d\n",debug_info);
+  print_info(0);
+  print_all_shm(shmptr);
+  message x;
+  printf("\nStart queue:\n");
+  while (msgrcv(msq_start,&x,msgsize,0,IPC_NOWAIT) == 0 || errno == EINTR) {
+    if (errno == EINTR) continue;
+    print_message(&x);
+  }
+  printf("\nMatch queue:\n");
+  while (msgrcv(msq_match,&x,msgsize,0,IPC_NOWAIT) == 0 || errno == EINTR) {
+    if (errno == EINTR) continue;
+    print_message(&x);
+  }
+  printf("\nContact queue:\n");
+  while (msgrcv(msq_contact,&x,msgsize,0,IPC_NOWAIT) == 0 || errno == EINTR) {
+    if (errno == EINTR) continue;
+    print_message(&x);
+  }
+  people_for_each(a_people,debug_person);
+  people_for_each(b_people,debug_person);
+  sleep(1);
+  quit(0);
+}
+
+void debug_person(person* p) {
+  if (kill(p->pid,SIGUSR2) == -1) {
+    printf("Debug person failed.\n");
   }
 }
 
@@ -423,53 +490,64 @@ void ready_receive(person* p) {
 void set_signals() {
   struct sigaction s_quit;
   struct sigaction s_birth_death;
+  struct sigaction s_segv;
   // assegna gli handler
+  s_segv.sa_handler = debug;
   s_quit.sa_handler = quit;
   s_birth_death.sa_handler = print_info;
   // quit non viene interrotto da nessun segnale
+  sigfillset(&s_segv.sa_mask);
   sigfillset(&s_quit.sa_mask);
   // birth_death puo' essere interrotto dagli altri segnali
   sigemptyset(&s_birth_death.sa_mask);
   // handler per i segnali di terminazione
-  sigaction(SIGINT,&s_quit,NULL);
+  sigaction(SIGINT,&s_segv,NULL);
   sigaction(SIGTERM,&s_quit,NULL);
+  sigaction(SIGSEGV,&s_segv,NULL);
   // Il birth-death avviene tramite il segnale SIGALRM
   sigaction(SIGALRM,&s_birth_death,NULL);
 }
 
 /* Inizia la simulazione */
 void start() {
+  debug_func("start");
+  // Crea le prime persone
   for (int i = 0;i < INIT_PEOPLE;i++) {
     spawn_new_person(NULL,0);
   }
+  // Attende che siano pronte
   people_for_each(a_people,ready_receive);
   people_for_each(b_people,ready_receive);
-  print_info(0);
+  // Inizia il ciclo di vita
   people_for_each(a_people,segnala_start);
   people_for_each(b_people,segnala_start);
+  alarm(1);
+  // Attende i messaggi di accoppiamento
   wait_for_messages();
 }
 
 /* Handler dei segnali di terminazione.
 Uccide i figli, cancella le strutture IPC e stampa le informazioni finali */
 void quit(int sig) {
-  kill_all();
-  print_info(0);
+  //kill_all();
+  //print_info(0);
   // cancella la memoria condivisa
   shm_destroy();
-  // cancella la coda di messaggi
+  // cancella le code di messaggi
   msgctl(msq_match,IPC_RMID,NULL);
   msgctl(msq_start,IPC_RMID,NULL);
+  msgctl(msq_contact,IPC_RMID,NULL);
   // chiude il file urandom
   fclose(urandom);
   // exit
   exit(EXIT_SUCCESS);
 }
 
-
 /* Inizializza le strutture IPC, le variabili di gestione,
 gli handler dei segnali etc. */
 void init() {
+  debug_func = malloc(64);
+  debug_func("init");
   // gestione segnali
   set_signals();
   // Inizializza le variabili a 0
@@ -482,12 +560,7 @@ void init() {
   // Apre il file urandom
   urandom = fopen("/dev/urandom", "r");
   // Crea le code di messaggi
-  if ((msq_match = msgget(MSG_MATCH,IPC_CREAT /* | IPC_EXCL */ | 0600)) == -1) {
-    printf("Failed to create message queue.\n");
-  }
-  if ((msq_start = msgget(MSG_START,IPC_CREAT /* | IPC_EXCL */ | 0600)) == -1) {
-    printf("Failed to create message queue.\n");
-  }
+  msq_init();
   msgsize = sizeof(message)-sizeof(long);
   // Inizializza la memoria condivisa
   shm_init();
@@ -501,7 +574,6 @@ void init() {
   a_people = init_people();
   b_people = init_people();
 }
-
 
 int main() {
   init();

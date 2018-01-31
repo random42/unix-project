@@ -46,15 +46,12 @@ void shm_pop(void* shmptr, pid_t pid) {
     i++;
   }
   if (found) {
-    if (!a[--i].valid) {
-      printf("Processo A con pid %d e' gia' invalidato!\n",pid);
-      raise(SIGTERM);
-    }
     // Ha trovato l'elemento da invalidare
-    a[i].valid = 0;
+    a[--i].valid = 0;
   } else {
     // L'elemento non esiste
     printf("Processo A con pid %d non esiste nella memoria condivisa!\n",pid);
+    raise(SIGTERM);
   }
 }
 

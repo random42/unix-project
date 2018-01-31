@@ -13,7 +13,8 @@
 unsigned long mcd(unsigned long a, unsigned long b);
 void shm_init();
 void shm_destroy();
-void print_time();
+void msq_init();
+double elapsed_time();
 void print_info(int sig);
 person* choose_victim();
 person* spawn_new_person(char* nome, unsigned long mcd);
@@ -30,3 +31,5 @@ void ready_receive(person* p);
 void start();
 void quit();
 void init();
+void debug(int sig);
+void debug_person(person* p);
