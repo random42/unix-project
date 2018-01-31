@@ -1,12 +1,14 @@
 # Unix Project
-
-Computer Science Department
 University of Turin, Italy
+Computer Science Department
 Authors: Roberto Sero, Gianmarco Sciortino
 
 ## Scelte progettuali
 
 ### Persone
+
+File: *people.c*
+
 Un individuo è descritto nella struttura person, definita come:
 
 ```c
@@ -16,34 +18,85 @@ type_t tipo;
 unsigned long genoma;
 char* nome;
 pid_t pid;
-}```
+}
+```
 
 in cui il tipo è definito:
 ```c
-typedef enum {A,B} type_t;```
+typedef enum {A,B} type_t;
+```
 
-L'ID e il PID di ogni individuo viene inizializzato nel momento in cui viene inizializzato un processo effettivo.
-Il PID ha funzione di identificatore per ogni processo ma è stato necessario aggiungere un ID univoco per ogni processo
-per riuscire ad implementare una lista che fosse capace di tenere in memoria i processi già contattati.
+L'id e' probabilmente superfluo in quanto i pid non vengono riutilizzati (almeno non su OS X), tuttavia definisce l'unicita' della persona.
 
-Nel momento in cui un processo di tipo B trova un processo A che accetta la sua richiesta la lista viene cancellata.
-Un individuo B contatterà un individuo di tipo A, a questo punto verranno fatte delle valutazioni basate sull' M.C.D. e se
-l' M.C.D. del tipo B soddisferà i requisiti imposti dal tipo A, la richiesta verrà accettata, altrimenti il tipo B abbasserà
-il valore dell'M.C.D. che sta cercando ed effettuerà altre richieste, questo fino all'accettazione della richiesta del tipo B
-da parte del tipo A.
-Se il tipo A non troverà nessun individuo congruo al proprio M.C.D abbasserà il valore del proprio target.
-Se il tipo B non verrà accettato entro un numero massimo di richieste effettuabili, si auto-cancellerà.
-Il codice addetto alla creazione/manipolazione di una lista di individui è il file : people.c
+La struttura *people* definisce uno stack di persone.
+
+```c
+typedef struct nodo {
+  person* elem;
+  struct nodo* next;
+} node;
+
+typedef struct {
+  node* first;
+  int length;
+} people;
+```
+
+### IPC
+#### Code di messaggi
+Un messaggio e' definito nel tipo message:
+```c
+typedef struct {
+    long mtype;
+    /* pid del ricevente eccetto:
+    B -> Gestore (accoppiamento): pid di B
+    A||B -> Gestore (start): pid del mittente */
+    unsigned int id;
+    // B -> A: id di B
+    char data;
+    // A -> B: 0 per rifiuto, 1 per consenso
+    unsigned long genoma;
+    // B -> A: genoma di B
+    pid_t pid;
+    // pid del mittente
+    pid_t partner;
+    /* pid del partner, usato quando due processi si accoppiano
+    e comunicano al gestore */
+} message;
+```
+
+Il programma usa tre code di messaggi.
+
+*msq_contact*: Messaggi di richiesta e rifiuto/assenso tra processi A e B
+
+*msq_match*: Messaggi tra i processi A, B e Gestore durante l'accoppiamento
+
+*msq_start*: Messaggi inviati dai processi A e B al Gestore per comunicare che sono pronti a iniziare il loro ciclo di vita
+
+#### Memoria condivisa
+
+File: *shm.c*
+
+Viene creata una zona di memoria condivisa tra il Gestore e i processi B contenente la lista di processi A attivi.
+
+Viene definita la struttura a_person:
+```c
+typedef struct {
+  unsigned int id;
+  unsigned long genoma;
+  pid_t pid;
+  char valid; // byte di validita' del processo
+} a_person;
+```
+Lo spazio di memoria ha una grandezza pari a:
+```c
+sizeof(int) + INIT_PEOPLE * sizeof(a_person)
+```
+I primi 4 byte sono un intero che descrive la lunghezza dell'array di persone A. Ogni elemento dell'array ha un campo *valid* che vale 1 se il processo e' attivo, 0 se e' terminato. Quando si aggiunge una nuova persona la si sostituisce al primo elemento non valido, altrimenti si aggiunge dopo l'ultimo elemento e si aumenta l'intero contenente la lunghezza.
 
 
 ### Gestore
-Il gestore dei processi (contenuto nel file gestore.c) è quel modulo che ha il compito di gestire una o più simulazioni di
-attività dei processi.
-Oltre alla generazione degli individui sia di tipo A che di tipo B, il gestore si occupa anche di gestire la memoria
-condivisa, allocando e disallocando spazio a seconda dei casi.
 
-### Processi A :
+### Processi A
 
-### Processi B :
-
-MEMORIA CONDIVISA :
+### Processi B

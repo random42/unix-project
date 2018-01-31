@@ -12,20 +12,18 @@
 // Struttura dei messaggi
 typedef struct {
     long mtype;
-    /* pid del ricevente eccetto
-    B -> Gestore: pid di B
-    questo e' per ricevere sempre i messaggi della coppia insieme
-    */
+    /* pid del ricevente eccetto:
+    B -> Gestore (accoppiamento): pid di B
+    A||B -> Gestore (start): pid del mittente */
     unsigned int id;
-    // id del processo B tra B -> A
+    // B -> A: id di B
     char data;
-    /*
-    A -> B: 0 per rifiuto, 1 per consenso
-    */
+    // A -> B: 0 per rifiuto, 1 per consenso
     unsigned long genoma;
-    // usato solo tra processi A e B per comunicare il proprio genoma
+    // B -> A: genoma di B
     pid_t pid;
-    // PID del mittente
+    // pid del mittente
     pid_t partner;
-    // PID del parter, usato quando due processi si accoppiano e comunicano al gestore
+    /* pid del partner, usato quando due processi si accoppiano
+    e comunicano al gestore */
 } message;
