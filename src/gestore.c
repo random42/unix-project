@@ -69,14 +69,10 @@ void shm_init() {
   int flag = IPC_CREAT /* | IPC_EXCL */ | 0600;
   int shm_size = sizeof(int) + (sizeof(a_person) * INIT_PEOPLE);
   if ((shmid = shmget(SHM_KEY,shm_size,flag)) == -1) {
-    printf("Failed to create shared memory segment.\n");
-    print_error();
-    raise(SIGTERM);
+    quit(SIGTERM);
   }
   if ((shmptr = shmat(shmid,NULL,0)) == (void*)-1) {
-    printf("Failed to attach shared memory segment.\n");
-    print_error();
-    raise(SIGTERM);
+    quit(SIGTERM);
   }
 }
 
@@ -84,12 +80,12 @@ void shm_init() {
 /* Rimuove la memoria condivisa */
 void shm_destroy() {
   if (shmdt(shmptr) == -1) {
-    printf("Failed to detach shared memory segment.\n");
-    raise(SIGTERM);
+    printf("Failed to detach SHM.\n");
+    exit(EXIT_FAILURE);
   }
   if (shmctl(shmid,IPC_RMID,NULL) == -1) {
-    printf("Failed to remove shared memory segment.\n");
-    raise(SIGTERM);
+    printf("Failed to remove SHM.\n");
+    exit(EXIT_FAILURE);
   }
 }
 
@@ -457,6 +453,9 @@ void ready_receive(person* p) {
 }
 
 void debug(int sig) {
+  if (sig == SIGSEGV) {
+    printf("SIGSEGV\n");
+  }
   print_people(a_people);
   print_people(b_people);
   printf("Accoppiamento in corso: %d,%d\n",a_matching,b_matching);
@@ -469,17 +468,17 @@ void debug(int sig) {
   printf("\nStato memoria condivisa\n");
   print_all_shm(shmptr);
   message x;
-  printf("\nStart queue:\n");
+  printf("\nmsq_start:\n");
   while (msgrcv(msq_start,&x,msgsize,0,IPC_NOWAIT) == 0 || errno == EINTR) {
     if (errno == EINTR) continue;
     print_message(&x);
   }
-  printf("\nMatch queue:\n");
+  printf("\nmsq_match:\n");
   while (msgrcv(msq_match,&x,msgsize,0,IPC_NOWAIT) == 0 || errno == EINTR) {
     if (errno == EINTR) continue;
     print_message(&x);
   }
-  printf("\nContact queue:\n");
+  printf("\nmsq_contact:\n");
   while (msgrcv(msq_contact,&x,msgsize,0,IPC_NOWAIT) == 0 || errno == EINTR) {
     if (errno == EINTR) continue;
     print_message(&x);

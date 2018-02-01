@@ -109,6 +109,9 @@ void ascolta() {
 }
 
 void debug(int sig) {
+  if (sig == SIGSEGV) {
+    printf("SIGSEGV  ");
+  }
   printf("%d {type: A, function: %s, info: %d, target: %lu, genoma: %lu, contacts: %lu}\n",getpid(),debug_func,debug_info,target,genoma,contacts);
   quit(0);
 }

@@ -154,6 +154,9 @@ void start() {
 }
 
 void debug(int sig) {
+  if (sig == SIGSEGV) {
+    printf("SIGSEGV  ");
+  }
   printf("%d {type: B, function: %s, info: %d, target: %lu, genoma: %lu }\n",getpid(),debug_func,debug_info,target,genoma);
   quit(0);
 }

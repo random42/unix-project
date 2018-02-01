@@ -63,6 +63,7 @@ void set_signals(void(quit)(int),void(debug)(int)) {
   sigaction(SIGUSR1,&sig_do_nothing,NULL);
   sigaction(SIGUSR2,&sig_debug,NULL);
   sigaction(SIGSEGV,&sig_debug,NULL);
+  sigaction(SIGINT,&sig_do_nothing,NULL);
 }
 
 void msq_init() {
