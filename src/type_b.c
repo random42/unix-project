@@ -17,6 +17,9 @@ unsigned long genoma;
 char* nome;
 unsigned int id;
 
+// pid del partner accoppiato
+int partner;
+
 // Array degli ID dei processi A gia' contattati
 unsigned int black_list[INIT_PEOPLE];
 int black_list_length;
@@ -71,6 +74,7 @@ int not_black_list(unsigned int id) {
 /* Si accoppia ad A */
 void accoppia(pid_t pid) {
   debug_func("accoppia");
+  partner = pid;
   message s;
   s.mtype = getpid();
   s.pid = getpid();
@@ -84,7 +88,8 @@ void accoppia(pid_t pid) {
   // Attende il segnale di terminazione
   debug_func("Pause 2");
   pause();
-  printf("B %d riprende esecuzione\n",getpid());
+  partner = 0;
+  //printf("B %d riprende esecuzione\n",getpid());
 }
 
 char contatta(pid_t pid) {
@@ -96,7 +101,6 @@ char contatta(pid_t pid) {
   s.genoma = genoma;
   s.id = id;
   while (msgsnd(msq_contact,&s,msgsize,0) == -1 && errno == EINTR) continue;
-  debug_info = pid;
   while (msgrcv(msq_contact,&r,msgsize,getpid(),0) == -1 && errno == EINTR) continue;
   return r.data;
 }
@@ -134,6 +138,7 @@ void init() {
   set_signals(quit,debug);
   // inizializza le variabili
   debug_func = malloc(64);
+  debug_info = 0;
   black_list_length = 0;
   // le code di messaggi
   msq_init();
@@ -157,7 +162,7 @@ void debug(int sig) {
   if (sig == SIGSEGV) {
     printf("SIGSEGV  ");
   }
-  printf("%d {type: B, function: %s, info: %d, target: %lu, genoma: %lu }\n",getpid(),debug_func,debug_info,target,genoma);
+  printf("%d {type: B, function: %s, info: %d, target: %lu, genoma: %lu, partner: %d }\n",getpid(),debug_func,debug_info,target,genoma,partner);
   quit(0);
 }
 

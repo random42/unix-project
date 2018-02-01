@@ -15,6 +15,9 @@
 unsigned long genoma;
 char* nome;
 
+// pid del partner accoppiato
+int partner;
+
 // mcd target
 unsigned long target;
 
@@ -56,6 +59,7 @@ void push_contact(unsigned int id) {
 // accetta il processo B e si accoppia
 void accetta(pid_t pid) {
   debug_func("accetta");
+  partner = pid;
   message s;
   s.data = 1;
   s.mtype = pid;
@@ -75,7 +79,8 @@ void accetta(pid_t pid) {
   }
   debug_func("Pause 2");
   pause();
-  printf("A %d riprende esecuzione\n",getpid());
+  //printf("A %d riprende esecuzione\n",getpid());
+  partner = 0;
 }
 
 // rifiuta il processo B
@@ -112,7 +117,7 @@ void debug(int sig) {
   if (sig == SIGSEGV) {
     printf("SIGSEGV  ");
   }
-  printf("%d {type: A, function: %s, info: %d, target: %lu, genoma: %lu, contacts: %lu}\n",getpid(),debug_func,debug_info,target,genoma,contacts);
+  printf("%d {type: A, function: %s, info: %d, target: %lu, genoma: %lu, contacts: %lu, partner: %d }\n",getpid(),debug_func,debug_info,target,genoma,contacts,partner);
   quit(0);
 }
 

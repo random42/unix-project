@@ -586,5 +586,5 @@ void init() {
 
 int main() {
   init();
-  quit(0);
+  start();
 }
