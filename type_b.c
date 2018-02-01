@@ -8,6 +8,7 @@
 #include <errno.h>
 #include "header.h"
 #include "shm.h"
+#include "child.h"
 #include "type_b.h"
 
 
@@ -17,11 +18,11 @@ char* nome;
 unsigned int id;
 
 // Array degli ID dei processi A gia' contattati
-unsigned int black_list[SHM_LENGTH];
+unsigned int black_list[INIT_PEOPLE];
 int black_list_length;
 
 // Divisori del proprio genoma
-unsigned long* divisors;
+unsigned long* divisori;
 int div_length;
 
 //mcd target
@@ -43,14 +44,10 @@ void shm_init() {
   int flag = 0600;
   int size = sizeof(int) + (sizeof(a_person) * INIT_PEOPLE);
   if ((shmid = shmget(SHM_KEY,size,flag)) == -1) {
-    printf("Failed to get shared memory segment.\n");
-    print_error();
-    raise(SIGTERM);
+    exit(EXIT_FAILURE);
   }
   if ((shmptr = shmat(shmid,NULL,0)) == (void*)-1) {
-    printf("Failed to attach shared memory segment.\n");
-    print_error();
-    raise(SIGTERM);
+    exit(EXIT_FAILURE);
   }
 }
 
@@ -58,19 +55,8 @@ void shm_init() {
 void shm_detach() {
   if (shmdt(shmptr) == -1) {
     printf("Failed to detach shared memory segment.\n");
-    raise(SIGTERM);
+    exit(EXIT_FAILURE);
   }
-}
-
-
-unsigned long mcd(unsigned long a, unsigned long b) {
-  unsigned long r;
-  while (a % b != 0) {
-    r = a%b;
-    a = b;
-    b = r;
-  }
-  return b;
 }
 
 int not_black_list(unsigned int id) {
@@ -139,73 +125,22 @@ void cerca() {
       i = 0;
       black_list_length = 0;
     }
-    target = divisors[i++];
+    target = divisori[i++];
     cerca_target();
   }
 }
 
-void find_divisors() {
-  divisors[0] = genoma;
-  unsigned long i = genoma/2;
-  int index = 1;
-  while (i > 0) {
-    if (genoma % i == 0) {
-      divisors[index++] = i;
-    }
-    i--;
-  }
-  div_length = index;
-}
-
-void set_signals() {
-  struct sigaction sig_term;
-  struct sigaction sig_debug;
-  struct sigaction sig_do_nothing;
-  // handlers
-  sig_debug.sa_handler = debug;
-  sig_do_nothing.sa_handler = do_nothing;
-  sig_term.sa_handler = quit;
-  // masks
-  sigfillset(&sig_term.sa_mask);
-  sigfillset(&sig_debug.sa_mask);
-  sigfillset(&sig_do_nothing.sa_mask);
-  // Setta gli handler dei segnali
-  sigaction(SIGTERM,&sig_term,NULL);
-  sigaction(SIGALRM,&sig_debug,NULL);
-  sigaction(SIGUSR1,&sig_do_nothing,NULL);
-  sigaction(SIGUSR2,&sig_debug,NULL);
-}
-
-void msq_init() {
-  if ((msq_match = msgget(MSG_MATCH,0)) == -1) {
-    printf("Failed to get message queue. A\n");
-    raise(SIGTERM);
-  }
-  if ((msq_start = msgget(MSG_START,0)) == -1) {
-    printf("Failed to get message queue. A\n");
-    raise(SIGTERM);
-  }
-  if ((msq_contact = msgget(MSG_CONTACT,0)) == -1) {
-    printf("Failed to get message queue. A\n");
-    raise(SIGTERM);
-  }
-}
-
-void do_nothing(int sig){}
-
 void init() {
-  set_signals();
+  set_signals(quit,debug);
   // inizializza le variabili
   debug_func = malloc(64);
-  divisors = malloc(sizeof(unsigned long) * (genoma > 60 ? genoma/5 : genoma));
   black_list_length = 0;
-  msgsize = sizeof(message)-sizeof(long);
   // le code di messaggi
   msq_init();
   // la memoria condivisa
   shm_init();
   // trova i divisori
-  find_divisors();
+  trova_divisori();
 }
 
 void quit(int sig) {
@@ -216,12 +151,6 @@ void quit(int sig) {
 void start() {
   alarm(5);
   cerca();
-}
-
-void ready() {
-  message m;
-  m.mtype = getpid();
-  while (msgsnd(msq_start,&m,msgsize,0) == -1 && errno == EINTR) continue;
 }
 
 void debug(int sig) {

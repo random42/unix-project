@@ -10,9 +10,9 @@
 #include <sys/msg.h>
 #include <string.h>
 #include <errno.h>
-#ifndef GESTORE_H
+#include "header.h"
 #include "gestore.h"
-#endif
+#include "shm.h"
 
 FILE* urandom;
 // File contenuto in /dev/urandom utilizzato per leggere random bytes.

@@ -6,6 +6,7 @@
 #include <string.h>
 #include <errno.h>
 #include "header.h"
+#include "child.h"
 #include "type_a.h"
 
 
@@ -21,7 +22,7 @@ unsigned long target;
 unsigned long contacts;
 
 // Divisori del proprio genoma
-unsigned long* divisors;
+unsigned long* divisori;
 int div_length;
 
 int msq_match;
@@ -32,37 +33,12 @@ int msgsize;
 char* debug_func;
 int debug_info;
 
-void find_divisors() {
-  divisors[0] = genoma;
-  unsigned long i = genoma/2;
-  int index = 1;
-  while (i > 0) {
-    if (genoma % i == 0) {
-      divisors[index++] = i;
-    }
-    i--;
-  }
-  div_length = index;
-}
-
-
-unsigned long mcd(unsigned long a, unsigned long b) {
-  unsigned long r;
-  while (a % b != 0) {
-    r = a%b;
-    a = b;
-    b = r;
-  }
-  return b;
-}
-
-
 void abbassa_target() {
   debug_func("abbassa_target");
   int i = 0;
-  while (i < div_length && target != divisors[i]) i++;
+  while (i < div_length && target != divisori[i]) i++;
   if (target > 1) {
-    target = divisors[i+1];
+    target = divisori[i+1];
   }
 }
 
@@ -76,7 +52,6 @@ void push_contact(unsigned int id) {
     contacts = 0;
   }
 }
-
 
 // accetta il processo B e si accoppia
 void accetta(pid_t pid) {
@@ -134,61 +109,22 @@ void ascolta() {
   }
 }
 
-void do_nothing(int sig){}
-
-void msq_init() {
-  if ((msq_match = msgget(MSG_MATCH,0)) == -1) {
-    printf("Failed to get message queue. A\n");
-    raise(SIGTERM);
-  }
-  if ((msq_start = msgget(MSG_START,0)) == -1) {
-    printf("Failed to get message queue. A\n");
-    raise(SIGTERM);
-  }
-  if ((msq_contact = msgget(MSG_CONTACT,0)) == -1) {
-    printf("Failed to get message queue. A\n");
-    raise(SIGTERM);
-  }
-}
-
-void set_signals() {
-  struct sigaction sig_term;
-  struct sigaction sig_debug;
-  struct sigaction sig_do_nothing;
-  // handlers
-  sig_debug.sa_handler = debug;
-  sig_do_nothing.sa_handler = do_nothing;
-  sig_term.sa_handler = quit;
-  // masks
-  sigfillset(&sig_term.sa_mask);
-  sigfillset(&sig_debug.sa_mask);
-  sigfillset(&sig_do_nothing.sa_mask);
-  // Setta gli handler dei segnali
-  sigaction(SIGTERM,&sig_term,NULL);
-  sigaction(SIGALRM,&sig_debug,NULL);
-  sigaction(SIGUSR1,&sig_do_nothing,NULL);
-  sigaction(SIGUSR2,&sig_debug,NULL);
-}
-
 void debug(int sig) {
   printf("%d {type: A, function: %s, info: %d, target: %lu, genoma: %lu, contacts: %lu}\n",getpid(),debug_func,debug_info,target,genoma,contacts);
   quit(0);
 }
 
 void init() {
-  set_signals();
+  set_signals(quit,debug);
   debug_func = malloc(64);
-  // inizializza l'array di divisori
-  divisors = malloc(sizeof(unsigned long) * (genoma > 60 ? genoma/5 : genoma));
   // le variabili
   contacts = 0;
-  msgsize = sizeof(message)-sizeof(long);
   // le code di messaggi
   msq_init();
   // cerca i divisori
-  find_divisors();
+  trova_divisori();
   // target iniziale = genoma
-  target = divisors[0];
+  target = divisori[0];
 }
 
 void quit(int sig) {
@@ -198,12 +134,6 @@ void quit(int sig) {
 void start() {
   alarm(5);
   ascolta();
-}
-
-void ready() {
-  message m;
-  m.mtype = getpid();
-  while (msgsnd(msq_start,&m,msgsize,0) == -1 && errno == EINTR) continue;
 }
 
 int main(int argc, char* argv[]) {

@@ -1,3 +1,4 @@
+#ifndef PEOPLE_H
 #define PEOPLE_H
 
 typedef enum {A,B} type_t;
@@ -15,7 +16,6 @@ typedef struct nodo {
   struct nodo* next;
 } node;
 
-
 typedef struct {
   node* first;
   int length;
@@ -29,7 +29,6 @@ people* create_people(int num);
 void push_person(people* l, person* p);
 void pop_person(people* l, pid_t pid);
 people* init_people();
-people* join(people* a, people* b);
 void print_people(people* arr);
 void print_person(person* p);
 void people_for_each(people* arr, void (*f)(person*));
@@ -38,3 +37,5 @@ void delete_person(person* p);
 person* get_person(people* l, pid_t pid);
 person* get_longest_name(people* arr);
 person* get_greatest_genoma(people* arr);
+
+#endif

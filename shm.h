@@ -1,7 +1,6 @@
-#ifndef PEOPLE_H
-#include "people.h"
-#endif
+#ifndef SHM_H
 #define SHM_H
+#include "people.h"
 #define SHM_LENGTH 2048
 #define SHM_KEY 1234
 
@@ -17,3 +16,5 @@ void shm_push(void* shmptr, person* p);
 void shm_pop(void* shmptr, pid_t pid);
 void print_valid_shm(void* shmptr);
 void print_all_shm(void* shmptr);
+
+#endif

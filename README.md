@@ -19,10 +19,10 @@ Eseguire /bin/gestore:
 
 `$ ./bin/gestore`
 
-*Importante!* Eseguire il gestore sempre dalla root directory, non navigare in bin! 
+***Importante!*** Eseguire il gestore sempre dalla root directory, non navigare in bin!
 
 
-## Scelte progettuali
+## Struttura e scelte progettuali
 
 ### Persone
 
@@ -113,6 +113,20 @@ sizeof(int) + INIT_PEOPLE * sizeof(a_person)
 ```
 I primi 4 byte sono un intero che descrive la lunghezza dell'array di persone A. Ogni elemento dell'array ha un campo *valid* che vale 1 se il processo e' attivo, 0 se e' terminato. Quando si aggiunge una nuova persona la si sostituisce al primo elemento non valido, altrimenti si aggiunge dopo l'ultimo elemento e si aumenta l'intero contenente la lunghezza.
 
+#### Segnali
+
+Per ogni tipo di processo vengono impostati gli handler per alcuni segnali.
+
+La funzione di **debug** stampa una stringa *debug_func* contenente l'ultima funzione chiamata, un intero *debug_info* da assegnabile a scelta e informazioni aggiuntive sullo stato del processo. Essa **termina** sempre il processo (o il programma, nel caso del gestore).
+
+  | Gestore | A & B
+----|---------|---|---
+SIGTERM|Termina il programma|Termina il processo
+SIGINT|Debug e termina il programma|NULL
+SIGUSR1|NULL|Handler vuoto, per continuare l'esecuzione
+SIGUSR2|NULL|Debug, inviato dal gestore
+SIGALRM|Funzione birth_death|Debug, impostato a inizio esecuzione con alarm(5) nel caso non si accoppiasse
+SIGSEGV|Debug|Debug
 
 ### Gestore
 

@@ -1,12 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#ifndef HEADER_H
 #include "header.h"
-#endif
-#ifndef PEOPLE_H
 #include "people.h"
-#endif
 
 extern char* debug_func;
 extern int debug_info;
@@ -15,9 +11,9 @@ extern FILE* urandom;
 /* Genera un tipo (A,B) random */
 type_t random_type() {
   debug_func("random_type");
-  short num;
+  unsigned short num;
   fread(&num, sizeof(short), 1, urandom);
-  return abs(num%2);
+  return num%2;
 }
 
 
@@ -192,20 +188,6 @@ people* init_people() {
   a->first = NULL;
   a->length = 0;
   return a;
-}
-
-/* Unisce due liste */
-people* join(people* a, people* b) {
-  debug_func("join");
-  people* r = init_people();
-  r->first = a->first;
-  node* n = r->first;
-  for (int i = 0;i < a->length-1;i++) {
-    n = n->next;
-  }
-  n->next = b->first;
-  r->length = a->length+b->length;
-  return r;
 }
 
 

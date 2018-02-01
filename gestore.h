@@ -1,14 +1,6 @@
+#ifndef GESTORE_H
 #define GESTORE_H
-
-#ifndef PEOPLE_H
 #include "people.h"
-#endif
-#ifndef HEADER_H
-#include "header.h"
-#endif
-#ifndef SHM_H
-#include "shm.h"
-#endif
 
 unsigned long mcd(unsigned long a, unsigned long b);
 void shm_init();
@@ -33,3 +25,5 @@ void quit();
 void init();
 void debug(int sig);
 void debug_person(person* p);
+
+#endif
