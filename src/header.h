@@ -1,6 +1,6 @@
 #ifndef HEADER_H
 #define HEADER_H
-#define BIRTH_DEATH 4
+#define BIRTH_DEATH 2
 #define SIM_TIME 20
 #define GENES 50
 #define INIT_PEOPLE 20

@@ -11,7 +11,7 @@ GESTORE = $(BUILD)gestore.o \
 					$(BUILD)people.o \
 					$(BUILD)shm.o
 
-all: gestore a b
+all: dir gestore a b
 gestore: $(GESTORE)
 	$(CC) -o $(BIN)$@ $^
 a: $(A)
@@ -20,5 +20,7 @@ b: $(B)
 	$(CC) -o $(BIN)$@ $^
 $(BUILD)%.o:	$(SRC)%.c
 	$(CC) -g -c $(SRC)$*.c -o $@
+dir:
+	mkdir -p $(BIN) $(BUILD)
 clean:
 	rm -rf $(BIN) $(BUILD)

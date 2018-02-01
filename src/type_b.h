@@ -10,5 +10,6 @@ void cerca_target();
 void cerca();
 void init();
 void quit(int sig);
+void debug(int sig);
 
 #endif

@@ -69,13 +69,13 @@ void set_signals(void(quit)(int),void(debug)(int)) {
 void msq_init() {
   msgsize = sizeof(message)-sizeof(unsigned long);
   if ((msq_match = msgget(MSG_MATCH,0)) == -1) {
-    raise(SIGTERM);
+    quit(0);
   }
   if ((msq_start = msgget(MSG_START,0)) == -1) {
-    raise(SIGTERM);
+    quit(0);
   }
   if ((msq_contact = msgget(MSG_CONTACT,0)) == -1) {
-    raise(SIGTERM);
+    quit(0);
   }
 }
 

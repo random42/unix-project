@@ -374,48 +374,48 @@ void wait_for_messages() {
 
 /* Termina un processo e ne crea uno nuovo ogni BIRTH_DEATH secondi */
 void birth_death(int sig) {
-  debug_func("birth_death");
-  if (a_people->length+b_people->length == 2) {
-    printf("Birth Death not possible!\n");
-    return;
-  }
-  // resetta il segnale SIGALRM
+  // debug_func("birth_death");
+  // if (a_people->length+b_people->length == 2) {
+  //   printf("Birth Death not possible!\n");
+  //   return;
+  // }
+  // // resetta il segnale SIGALRM
   alarm(BIRTH_DEATH);
-  // sceglie una vittima
-  person* victim;
-  while ((victim = choose_victim()) == NULL) continue;
-  printf("Victim:\n");
-  print_person(victim);
-  pid_t pid = victim->pid;
-  if (victim->tipo == A) {
-    // rimuove la persona dalla memoria condivisa
-    shm_pop(shmptr,pid);
-    // rimuove la persona dalla lista di persone di quel tipo
-    pop_person(a_people,pid);
-    empty_queue(pid,A);
-  } else {
-    pop_person(b_people,pid);
-    empty_queue(pid,B);
-  }
-  // manda il segnale di terminazione al processo
-  if (kill(pid, SIGTERM) == -1) {
-    printf("Segnale di terminazione fallito!\n");
-    raise(SIGTERM);
-  }
-  // esegue la wait
-  int status;
-  waitpid(pid,&status,0);
-  if (status != EXIT_SUCCESS) {
-    printf("%d did not exited with success.\n",pid);
-  }
-  // Crea un nuovo individuo
-  person* new = spawn_new_person(NULL,0);
-  // Attende che il processo sia pronto
-  ready_receive(new);
-  // Segnala di iniziare
-  segnala_start(new);
-  // Stampa le informazioni della simulazione
-  print_info(0);;
+  // // sceglie una vittima
+  // person* victim;
+  // while ((victim = choose_victim()) == NULL) continue;
+  // printf("Victim:\n");
+  // print_person(victim);
+  // pid_t pid = victim->pid;
+  // if (victim->tipo == A) {
+  //   // rimuove la persona dalla memoria condivisa
+  //   shm_pop(shmptr,pid);
+  //   // rimuove la persona dalla lista di persone di quel tipo
+  //   pop_person(a_people,pid);
+  //   empty_queue(pid,A);
+  // } else {
+  //   pop_person(b_people,pid);
+  //   empty_queue(pid,B);
+  // }
+  // // manda il segnale di terminazione al processo
+  // if (kill(pid, SIGTERM) == -1) {
+  //   printf("Segnale di terminazione fallito!\n");
+  //   raise(SIGTERM);
+  // }
+  // // esegue la wait
+  // int status;
+  // waitpid(pid,&status,0);
+  // if (status != EXIT_SUCCESS) {
+  //   printf("%d did not exited with success.\n",pid);
+  // }
+  // // Crea un nuovo individuo
+  // person* new = spawn_new_person(NULL,0);
+  // // Attende che il processo sia pronto
+  // ready_receive(new);
+  // // Segnala di iniziare
+  // segnala_start(new);
+  // // Stampa le informazioni della simulazione
+  print_info(0);
 }
 
 
@@ -503,8 +503,7 @@ void set_signals() {
   // assegna gli handler
   s_debug.sa_handler = debug;
   s_quit.sa_handler = quit;
-  //TODO cambiare handler
-  s_birth_death.sa_handler = print_info;
+  s_birth_death.sa_handler = birth_death;
   // segnali non interrompibili
   sigfillset(&s_debug.sa_mask);
   sigfillset(&s_quit.sa_mask);
@@ -587,5 +586,5 @@ void init() {
 
 int main() {
   init();
-  start();
+  quit(0);
 }

@@ -21,7 +21,7 @@ void segnala_start(person* p);
 void set_signals();
 void ready_receive(person* p);
 void start();
-void quit();
+void quit(int sig);
 void init();
 void debug(int sig);
 void debug_person(person* p);
