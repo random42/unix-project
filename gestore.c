@@ -286,17 +286,18 @@ void accoppia(int a, int b) {
 
 /* Svuota i messaggi contact di un processo terminato.
 Se di tipo A, rifiuta tutte le richieste pendenti
+Se di tipo B e c'e' un assenso di un tipo A, manda un messaggio di conferma negativo
 */
 void empty_queue(pid_t pid, int type) {
   debug_func("empty_queue");
-  // messaggio ricevuto
+  // messaggio da ricevere
   message r;
   // messaggio da inviare
   message s;
   s.data = 0;
   s.pid = pid;
   int status;
-  if (type == A) {
+  if (type == A) { // A
     while ((status = msgrcv(msq_contact,&r,msgsize,pid,IPC_NOWAIT)) != -1 || (status == -1 && errno == EINTR)) {
       if (status == -1) continue;
       // setta l'mtype per rispondere al processo B
@@ -304,8 +305,15 @@ void empty_queue(pid_t pid, int type) {
       // rifiuta le richieste pendenti
       while (msgsnd(msq_contact,&s,msgsize,0) == -1 && errno == EINTR) continue;
     }
-  } else {
-    while (msgrcv(msq_contact,&r,msgsize,pid,IPC_NOWAIT) != -1 || errno == EINTR) continue;
+  } else { // B
+    while (msgrcv(msq_contact,&r,msgsize,pid,IPC_NOWAIT) == -1 && errno == EINTR) continue;
+    if (errno != ENOMSG) { // c'e' un messaggio di rifiuto/assenso
+      if (r.data) { // assenso
+        s.mtype = r.pid;
+        // Manda messaggio di conferma negativo
+        while (msgsnd(msq_match,&s,msgsize,0) == -1 && errno == EINTR) continue;
+      }
+    }
   }
 
 }

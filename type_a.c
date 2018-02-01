@@ -66,17 +66,16 @@ void accetta(pid_t pid) {
   // Attende il messaggio di conferma di B
   message r;
   while (msgrcv(msq_match,&r,msgsize,getpid(),0) == -1 && errno == EINTR) continue;
-  // Messaggio per il gestore
-  s.mtype = getppid();
-  while (msgsnd(msq_match,&s,msgsize,0) == -1 && errno == EINTR) {
-    print_error();
-    raise(SIGTERM);
+  if (r.data) { // B ha confermato
+    // Messaggio per il gestore
+    s.mtype = getppid();
+    while (msgsnd(msq_match,&s,msgsize,0) == -1 && errno == EINTR) continue;
+  } else { // B e' stato ucciso quindi il gestore ha risposto al suo posto
+    return;
   }
-  // Aspetta il segnale di terminazione o quello di continue
-  // se il processo B e' terminato prima tramite birth_death
   debug_func("Pause 2");
   pause();
-  printf("A ricerca pid: %d\n",getpid());
+  printf("A %d riprende esecuzione\n",getpid());
 }
 
 // rifiuta il processo B

@@ -68,8 +68,7 @@ int not_black_list(unsigned int id) {
   return 1;
 }
 
-/* Manda un messaggio con il pid del processo A accoppiato
-al gestore, ma con mtype uguale al proprio pid*/
+/* Si accoppia ad A */
 void accoppia(pid_t pid) {
   debug_func("accoppia");
   message s;
@@ -80,11 +79,12 @@ void accoppia(pid_t pid) {
   while (msgsnd(msq_match,&s,msgsize,0) == -1 && errno == EINTR) continue;
   // Conferma ad A di aver mandato il messaggio
   s.mtype = pid;
+  s.data = 1;
   while (msgsnd(msq_match,&s,msgsize,0) == -1 && errno == EINTR) continue;
   // Attende il segnale di terminazione
   debug_func("Pause 2");
   pause();
-  printf("B ricerca pid: %d\n",getpid());
+  printf("B %d riprende esecuzione\n",getpid());
 }
 
 char contatta(pid_t pid) {

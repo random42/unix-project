@@ -31,13 +31,13 @@ File: *people.c*
 Un individuo è descritto nella struttura person, definita come:
 
 ```c
-struct {
-unsigned int id;
-type_t tipo;
-unsigned long genoma;
-char* nome;
-pid_t pid;
-}
+typedef struct {
+  unsigned int id;
+  type_t tipo;
+  unsigned long genoma;
+  char* nome;
+  pid_t pid;
+} person;
 ```
 
 in cui il tipo è definito:
@@ -119,8 +119,8 @@ Per ogni tipo di processo vengono impostati gli handler per alcuni segnali.
 
 La funzione di **debug** stampa una stringa *debug_func* contenente l'ultima funzione chiamata, un intero *debug_info* da assegnabile a scelta e informazioni aggiuntive sullo stato del processo. Essa **termina** sempre il processo (o il programma, nel caso del gestore).
 
-  | Gestore | A & B
-----|---------|---|---
+| Gestore | A & B
+---|---|---
 SIGTERM|Termina il programma|Termina il processo
 SIGINT|Debug e termina il programma|NULL
 SIGUSR1|NULL|Handler vuoto, per continuare l'esecuzione
