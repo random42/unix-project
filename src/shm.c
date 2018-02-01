@@ -60,7 +60,7 @@ void shm_pop(void* shmptr, pid_t pid) {
 void print_valid_shm(void* shmptr) {
   int length = *(int*)shmptr;
   a_person* a = shmptr+sizeof(int);
-  printf("ID\tGENOMA\tPID\n\n");
+  printf("\nID\tGENOMA\tPID\n\n");
   for (int i = 0; i < length;i++) {
     if (a[i].valid) {
       printf("%u\t%lu\t%d\n",a[i].id,a[i].genoma,a[i].pid);
@@ -74,7 +74,7 @@ void print_valid_shm(void* shmptr) {
 void print_all_shm(void* shmptr) {
   int length = *(int*)shmptr;
   a_person* a = shmptr+sizeof(int);
-  printf("VALID\tID\tGENOMA\tPID\n\n");
+  printf("\nVALID\tID\tGENOMA\tPID\n\n");
   for (int i = 0; i < length;i++) {
     printf("%s\t%u\t%lu\t%d\n",(a[i].valid ? "TRUE" : "FALSE"),a[i].id,a[i].genoma,a[i].pid);
   }

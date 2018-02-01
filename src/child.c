@@ -52,15 +52,17 @@ void set_signals(void(quit)(int),void(debug)(int)) {
   sig_debug.sa_handler = debug;
   sig_do_nothing.sa_handler = do_nothing;
   sig_term.sa_handler = quit;
-  // masks
+  // Handlers non interrompibili
   sigfillset(&sig_term.sa_mask);
   sigfillset(&sig_debug.sa_mask);
-  sigfillset(&sig_do_nothing.sa_mask);
+  // Handler interrompibile
+  sigemptyset(&sig_do_nothing.sa_mask);
   // Setta gli handler dei segnali
   sigaction(SIGTERM,&sig_term,NULL);
   sigaction(SIGALRM,&sig_debug,NULL);
   sigaction(SIGUSR1,&sig_do_nothing,NULL);
   sigaction(SIGUSR2,&sig_debug,NULL);
+  sigaction(SIGSEGV,&sig_debug,NULL);
 }
 
 void msq_init() {

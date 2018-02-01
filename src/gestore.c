@@ -459,12 +459,14 @@ void ready_receive(person* p) {
 void debug(int sig) {
   print_people(a_people);
   print_people(b_people);
-  printf("Matching: %d,%d\n",a_matching,b_matching);
+  printf("Accoppiamento in corso: %d,%d\n",a_matching,b_matching);
+  printf("Messaggio di A\n");
   print_message(&a_mess);
+  printf("Messaggio di B\n");
   print_message(&b_mess);
-  printf("Function: %s\n",debug_func);
+  printf("Funzione: %s\n",debug_func);
   printf("Info: %d\n",debug_info);
-  print_info(0);
+  printf("\nStato memoria condivisa\n");
   print_all_shm(shmptr);
   message x;
   printf("\nStart queue:\n");
@@ -498,20 +500,21 @@ void debug_person(person* p) {
 void set_signals() {
   struct sigaction s_quit;
   struct sigaction s_birth_death;
-  struct sigaction s_segv;
+  struct sigaction s_debug;
   // assegna gli handler
-  s_segv.sa_handler = debug;
+  s_debug.sa_handler = debug;
   s_quit.sa_handler = quit;
+  //TODO cambiare handler
   s_birth_death.sa_handler = print_info;
-  // quit non viene interrotto da nessun segnale
-  sigfillset(&s_segv.sa_mask);
+  // segnali non interrompibili
+  sigfillset(&s_debug.sa_mask);
   sigfillset(&s_quit.sa_mask);
   // birth_death puo' essere interrotto dagli altri segnali
   sigemptyset(&s_birth_death.sa_mask);
   // handler per i segnali di terminazione
-  sigaction(SIGINT,&s_segv,NULL);
+  sigaction(SIGINT,&s_debug,NULL);
   sigaction(SIGTERM,&s_quit,NULL);
-  sigaction(SIGSEGV,&s_segv,NULL);
+  sigaction(SIGSEGV,&s_debug,NULL);
   // Il birth-death avviene tramite il segnale SIGALRM
   sigaction(SIGALRM,&s_birth_death,NULL);
 }
@@ -537,7 +540,7 @@ void start() {
 /* Handler dei segnali di terminazione.
 Uccide i figli, cancella le strutture IPC e stampa le informazioni finali */
 void quit(int sig) {
-  //kill_all();
+  kill_all();
   //print_info(0);
   // cancella la memoria condivisa
   shm_destroy();

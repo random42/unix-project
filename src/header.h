@@ -1,3 +1,4 @@
+#ifndef HEADER_H
 #define HEADER_H
 #define BIRTH_DEATH 4
 #define SIM_TIME 20
@@ -27,3 +28,5 @@ typedef struct {
     /* pid del partner, usato quando due processi si accoppiano
     e comunicano al gestore */
 } message;
+
+#endif

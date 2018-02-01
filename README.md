@@ -61,8 +61,7 @@ typedef struct {
 } people;
 ```
 
-### IPC
-#### Code di messaggi
+### Code di messaggi
 Un messaggio e' definito nel tipo message:
 ```c
 typedef struct {
@@ -92,7 +91,7 @@ Il programma usa tre code di messaggi.
 
 *msq_start*: Messaggi inviati dai processi A e B al Gestore per comunicare che sono pronti a iniziare il loro ciclo di vita
 
-#### Memoria condivisa
+### Memoria condivisa
 
 File: *shm.c*
 
@@ -113,16 +112,16 @@ sizeof(int) + INIT_PEOPLE * sizeof(a_person)
 ```
 I primi 4 byte sono un intero che descrive la lunghezza dell'array di persone A. Ogni elemento dell'array ha un campo *valid* che vale 1 se il processo e' attivo, 0 se e' terminato. Quando si aggiunge una nuova persona la si sostituisce al primo elemento non valido, altrimenti si aggiunge dopo l'ultimo elemento e si aumenta l'intero contenente la lunghezza.
 
-#### Segnali
+### Segnali
 
 Per ogni tipo di processo vengono impostati gli handler per alcuni segnali.
 
-La funzione di **debug** stampa una stringa *debug_func* contenente l'ultima funzione chiamata, un intero *debug_info* da assegnabile a scelta e informazioni aggiuntive sullo stato del processo. Essa **termina** sempre il processo (o il programma, nel caso del gestore).
+La funzione di **debug** stampa una stringa *debug_func* contenente l'ultima funzione chiamata, un intero *debug_info* assegnabile a scelta e informazioni aggiuntive sullo stato del processo. Essa **termina** sempre il processo (o il programma, nel caso del gestore).
 
 || Gestore | A & B|
 |---|---|---|
 |SIGTERM|Termina il programma|Termina il processo|
-|SIGINT|Debug e termina il programma|NULL|
+|SIGINT|Debug|NULL|
 |SIGUSR1|NULL|Handler vuoto, per continuare l'esecuzione|
 |SIGUSR2|NULL|Debug, inviato dal gestore|
 |SIGALRM|Funzione birth_death|Debug, impostato a inizio esecuzione con alarm(5) nel caso non si accoppiasse|

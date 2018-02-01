@@ -71,7 +71,7 @@ void accetta(pid_t pid) {
     s.mtype = getppid();
     while (msgsnd(msq_match,&s,msgsize,0) == -1 && errno == EINTR) continue;
   } else { // B e' stato ucciso quindi il gestore ha risposto al suo posto
-    return;
+    printf("A %d B ucciso\n",getpid());
   }
   debug_func("Pause 2");
   pause();
