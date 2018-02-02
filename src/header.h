@@ -3,7 +3,7 @@
 #define BIRTH_DEATH 2
 #define SIM_TIME 20
 #define GENES 50
-#define INIT_PEOPLE 20
+#define INIT_PEOPLE 50
 #define MSG_MATCH 999
 #define MSG_START 888
 #define MSG_CONTACT 777

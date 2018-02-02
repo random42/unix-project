@@ -121,8 +121,8 @@ La funzione di **debug** stampa una stringa *debug_func* contenente l'ultima fun
 || Gestore | A & B|
 |---|---|---|
 |SIGTERM|Termina il programma|Termina il processo|
-|SIGINT|Debug|Handler vuoto, per ricevere il segnale di debug dal gestore senza terminare|
-|SIGUSR1|NULL|Handler vuoto, per continuare l'esecuzione|
+|SIGINT|Debug|Ignorato, riceve il segnale di debug dal gestore|
+|SIGUSR1|NULL|Handler vuoto, per continuare l'esecuzione dopo *pause()*|
 |SIGUSR2|NULL|Debug, inviato dal gestore|
 |SIGALRM|Funzione birth_death|Debug, impostato a inizio esecuzione con alarm(5) nel caso non si accoppiasse|
 |SIGSEGV|Debug|Debug|

@@ -48,7 +48,9 @@ void set_signals(void(quit)(int),void(debug)(int)) {
   struct sigaction sig_term;
   struct sigaction sig_debug;
   struct sigaction sig_do_nothing;
+  struct sigaction sig_ignore;
   // handlers
+  sig_ignore.sa_handler = SIG_IGN;
   sig_debug.sa_handler = debug;
   sig_do_nothing.sa_handler = do_nothing;
   sig_term.sa_handler = quit;
@@ -63,7 +65,7 @@ void set_signals(void(quit)(int),void(debug)(int)) {
   sigaction(SIGUSR1,&sig_do_nothing,NULL);
   sigaction(SIGUSR2,&sig_debug,NULL);
   sigaction(SIGSEGV,&sig_debug,NULL);
-  sigaction(SIGINT,&sig_do_nothing,NULL);
+  sigaction(SIGINT,&sig_ignore,NULL);
 }
 
 void msq_init() {
