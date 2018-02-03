@@ -1,14 +1,11 @@
 #ifndef HEADER_H
 #define HEADER_H
-#define BIRTH_DEATH 2
-#define SIM_TIME 20
-#define GENES 50
-#define INIT_PEOPLE 50
 #define MSG_MATCH 999
 #define MSG_START 888
 #define MSG_CONTACT 777
 #define print_error() printf("%s\n",strerror(errno))
-#define debug_func(x) strcpy(debug_func,x)
+#define add_func(x) strcpy(stack[stack_length++],x)
+#define rm_func() stack_length--
 
 // Struttura dei messaggi
 typedef struct {

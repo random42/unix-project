@@ -13,6 +13,10 @@ extern int msq_start;
 extern int msq_contact;
 extern int msgsize;
 
+extern char* stack[];
+extern int stack_length;
+extern int debug_info;
+
 extern unsigned long genoma;
 extern unsigned long* divisori;
 extern int div_length;
@@ -28,6 +32,7 @@ unsigned long mcd(unsigned long a, unsigned long b) {
 }
 
 void trova_divisori() {
+  add_func("trova_divisori");
   // inizializza l'array di divisori
   divisori = malloc(sizeof(unsigned long) * (genoma > 60 ? genoma/5 : genoma));
   divisori[0] = genoma;
@@ -40,11 +45,13 @@ void trova_divisori() {
     i--;
   }
   div_length = index;
+  rm_func();
 }
 
 void do_nothing(int sig){}
 
 void set_signals(void(quit)(int),void(debug)(int)) {
+  add_func("set_signals");
   struct sigaction sig_term;
   struct sigaction sig_debug;
   struct sigaction sig_do_nothing;
@@ -65,10 +72,14 @@ void set_signals(void(quit)(int),void(debug)(int)) {
   sigaction(SIGUSR1,&sig_do_nothing,NULL);
   sigaction(SIGUSR2,&sig_debug,NULL);
   sigaction(SIGSEGV,&sig_debug,NULL);
+  sigaction(SIGABRT,&sig_debug,NULL);
+  sigaction(SIGILL,&sig_debug,NULL);
   sigaction(SIGINT,&sig_ignore,NULL);
+  rm_func();
 }
 
 void msq_init() {
+  add_func("msq_init");
   msgsize = sizeof(message)-sizeof(unsigned long);
   if ((msq_match = msgget(MSG_MATCH,0)) == -1) {
     raise(SIGTERM);
@@ -79,10 +90,14 @@ void msq_init() {
   if ((msq_contact = msgget(MSG_CONTACT,0)) == -1) {
     raise(SIGTERM);
   }
+  rm_func();
 }
 
 void ready() {
+  add_func("ready");
   message m;
   m.mtype = getpid();
   while (msgsnd(msq_start,&m,msgsize,0) == -1 && errno == EINTR) continue;
+  pause();
+  rm_func();
 }

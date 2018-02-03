@@ -116,7 +116,7 @@ I primi 4 byte sono un intero che descrive la lunghezza dell'array di persone A.
 
 Per ogni tipo di processo vengono impostati gli handler per alcuni segnali.
 
-La funzione di **debug** stampa una stringa *debug_func* contenente l'ultima funzione chiamata, un intero *debug_info* assegnabile a scelta e informazioni aggiuntive sullo stato del processo. Essa **termina** sempre il processo (o il programma, nel caso del gestore).
+La funzione di **debug** stampa una stringa *add_func* contenente l'ultima funzione chiamata, un intero *debug_info* assegnabile a scelta e informazioni aggiuntive sullo stato del processo. Essa **termina** sempre il processo (o il programma, nel caso del gestore).
 
 || Gestore | A & B|
 |---|---|---|

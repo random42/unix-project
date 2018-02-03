@@ -2,15 +2,18 @@
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
-#ifndef SHM_H
+#include "header.h"
 #include "shm.h"
-#endif
 
+extern char* stack[];
+extern int stack_length;
+extern int debug_info;
 
 /* Inserisce nella memoria condivisa il nuovo processo A,
  andandolo a sostituire al primo processo non valido (gia' terminato)
  oppure aggiungendo un nuovo elemento all'array */
 void shm_push(void* shmptr, person* p) {
+  add_func("shm_push");
   int length = *(int*)shmptr;
   a_person* a = shmptr+sizeof(int);
   int found = 0;
@@ -32,11 +35,13 @@ void shm_push(void* shmptr, person* p) {
     a[length].valid = 1;
     (*(int*)shmptr)++;
   }
+  rm_func();
 }
 
 
 /* Pone a 0 il byte valid del processo A cercando il pid */
 void shm_pop(void* shmptr, pid_t pid) {
+  add_func("shm_pop");
   int length = *(int*)shmptr;
   a_person* a = shmptr+sizeof(int);
   int i = 0;
@@ -53,11 +58,13 @@ void shm_pop(void* shmptr, pid_t pid) {
     printf("Processo A con pid %d non esiste nella memoria condivisa!\n",pid);
     raise(SIGTERM);
   }
+  rm_func();
 }
 
 
 /* Stampa tutti i processi A validi */
 void print_valid_shm(void* shmptr) {
+  add_func("print_valid_shm");
   int length = *(int*)shmptr;
   a_person* a = shmptr+sizeof(int);
   printf("\nID\tGENOMA\tPID\n\n");
@@ -67,11 +74,13 @@ void print_valid_shm(void* shmptr) {
     }
   }
   printf("\n");
+  rm_func();
 }
 
 
 /* Stampa tutti i processi A nella memoria condivisa */
 void print_all_shm(void* shmptr) {
+  add_func("print_all_shm");
   int length = *(int*)shmptr;
   a_person* a = shmptr+sizeof(int);
   printf("\nVALID\tID\tGENOMA\tPID\n\n");
@@ -79,4 +88,5 @@ void print_all_shm(void* shmptr) {
     printf("%s\t%u\t%lu\t%d\n",(a[i].valid ? "TRUE" : "FALSE"),a[i].id,a[i].genoma,a[i].pid);
   }
   printf("\n");
+  rm_func();
 }

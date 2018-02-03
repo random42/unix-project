@@ -12,7 +12,7 @@ person* choose_victim();
 person* spawn_new_person(char* nome, unsigned long mcd);
 void gen_child(person* p);
 void accoppia(int a, int b);
-void empty_queue(pid_t pid, int type);
+void empty_queue(person* p);
 void wait_for_messages();
 void birth_death(int sig);
 void kill_all();
