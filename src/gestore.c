@@ -12,6 +12,7 @@
 #include <errno.h>
 #include "header.h"
 #include "gestore.h"
+#include "people.h"
 #include "shm.h"
 
 FILE* urandom;
@@ -253,6 +254,68 @@ void gen_child(person* p) {
   rm_func();
 }
 
+void end_match(person* p) {
+  add_func("end_match");
+  // riceve il messaggio con la fase di match e il partner
+  message r;
+  message s;
+  while (msgrcv(msq_start,&r,msgsize,p->pid,0) == -1 && errno == EINTR) continue;
+  int partner = r.partner;
+  int match_phase = r.data;
+  if (p->tipo == A) { // caso A
+    s.data = 0;
+    switch (match_phase) {
+      case 1: { // deve ancora rispondere al contatto di B
+        printf("A fase 1\n");
+        s.data = 0;
+        s.mtype = partner;
+        while (msgsnd(msq_contact,&s,msgsize,0) == -1 && errno == EINTR) continue;
+        break;
+      }
+      case 2: {  // Deve attendere la conferma di B e segnalare a B di continuare
+        printf("A fase 2\n");
+        // riceve il messaggio di conferma
+        while (msgrcv(msq_match,&r,msgsize,p->pid,0) == -1 && errno == EINTR) continue;
+        // preleva il messaggio che B ha mandato al gestore
+        while (msgrcv(msq_match,&r,msgsize,partner,IPC_NOWAIT) == -1 && errno == EINTR) continue;
+        // segnala a B di continuare
+        kill(partner,SIGUSR1);
+        break;
+      }
+      case 3: {  // Deve segnalare a B di continuare
+        printf("A fase 3\n");
+        // preleva il messaggio che B ha mandato al gestore
+        while (msgrcv(msq_match,&r,msgsize,partner,IPC_NOWAIT) == -1 && errno == EINTR) continue;
+        // segnala a B di continuare
+        kill(partner,SIGUSR1);
+        break;
+      }
+    }
+  }
+  else {  // caso B
+    s.data = 0;
+    s.mtype = partner;
+    switch (match_phase) {
+      case 1: { // ha contattato A
+        printf("B case 1\n");
+        // Riceve il messaggio di assenso/rifiuto
+        while (msgrcv(msq_contact,&r,msgsize,p->pid,0) == -1 && errno == EINTR) continue;
+        if (!r.data) { // A non ha accettato
+          break;
+        }
+        match_phase++;
+        // se ha accettato passa al caso 2
+      }
+      case 2: { // A ha accettato, non conferma il match
+        printf("B case 2\n");
+        while (msgsnd(msq_match,&s,msgsize,0) == -1 && errno == EINTR) continue;
+        break;
+      }
+    }
+  }
+  rm_func();
+}
+
 
 /* Riceve i pid dei processi accoppiati, pulisce le loro strutture e
 crea gli individui figli */
@@ -261,18 +324,13 @@ void accoppia(int a, int b) {
   // aumenta il numero di accoppiamenti totali
   matches++;
   // toglie A dalla memoria condivisa
-  shm_pop(shmptr,a);
+  shm_pop(shmptr,a_mess.pid);
   // esegue le wait
   waitpid(a,NULL,0);
   waitpid(b,NULL,0);
   // prende le persone dalla lista
   person* old_a = get_person(a_people,a);
   person* old_b = get_person(b_people,b);
-  //print_person(old_a);
-  //print_person(old_b);
-  // svuota i messaggi
-  empty_queue(old_a);
-  empty_queue(old_b);
   unsigned long mcd_v = mcd(old_a->genoma,old_b->genoma);
   // le rimuove dalla lista
   pop_person(a_people,a);
@@ -289,17 +347,21 @@ void accoppia(int a, int b) {
   // Segnala di iniziare il ciclo di vita
   segnala_start(new_1);
   segnala_start(new_2);
+  usleep(5000);
+  empty_queue(old_a);
+  empty_queue(old_b);
+  // In questo contesto serve solamente a prelevare il messaggio di terminazione
+  end_match(old_a);
+  end_match(old_b);
   // resetta le variabili di matching
   a_matching = 0;
   b_matching = 0;
+  printf("Match: %d, %d\n",a,b);
   rm_func();
 }
 
 
-/* Svuota i messaggi contact di un processo terminato.
-Se di tipo A, rifiuta tutte le richieste pendenti
-Se di tipo B e c'e' un assenso di un tipo A, manda un messaggio di conferma negativo
-*/
+/* Rifiuta le richieste pendenti dei processi A */
 void empty_queue(person* p) {
   add_func("empty_queue");
   pid_t pid = p->pid;
@@ -314,20 +376,21 @@ void empty_queue(person* p) {
     while ((status = msgrcv(msq_contact,&r,msgsize,pid,IPC_NOWAIT)) != -1 || (status == -1 && errno == EINTR)) {
       if (status == -1) continue;
       // setta l'mtype per rispondere al processo B
+      printf("%d empty %d\n",p->pid,r.pid);
       s.mtype = r.pid;
-      // rifiuta le richieste pendenti
+      // rifiuta le richiesta
       while (msgsnd(msq_contact,&s,msgsize,0) == -1 && errno == EINTR) continue;
     }
-  } else { // B
-    while (msgrcv(msq_contact,&r,msgsize,pid,IPC_NOWAIT) == -1 && errno == EINTR) continue;
-    if (errno != ENOMSG) { // c'e' un messaggio di rifiuto/assenso
-      if (r.data) { // assenso
-        s.mtype = r.pid;
-        // Manda messaggio di conferma negativo
-        while (msgsnd(msq_match,&s,msgsize,0) == -1 && errno == EINTR) continue;
-      }
-    }
-  }
+  } // else { // B
+  //   while (msgrcv(msq_contact,&r,msgsize,pid,IPC_NOWAIT) == -1 && errno == EINTR) continue;
+  //   if (errno != ENOMSG) { // c'e' un messaggio di rifiuto/assenso
+  //     if (r.data) { // assenso
+  //       s.mtype = r.pid;
+  //       // Manda messaggio di conferma negativo
+  //       while (msgsnd(msq_match,&s,msgsize,0) == -1 && errno == EINTR) continue;
+  //     }
+  //   }
+  // }
   rm_func();
 }
 
@@ -346,44 +409,33 @@ void wait_for_messages() {
   int max_match = 1000;
   int i = 0;
   while (1) {
-    debug_info = -1;
     // Riceve il messaggio di un processo A
     while (msgrcv(msq_match,&a_mess,msgsize,getpid(),0) == -1 && errno == EINTR) continue;
-    // Segnala a_mess birth_death che i processi sono in fase di matching
+    // Segnala a birth_death che i processi sono in fase di matching
     a_matching = a_mess.pid;
     b_matching = a_mess.partner;
-    debug_info = 1;
     // Riceve il messaggio del processo B con IPC_NOWAIT
-    debug_info = 2;
-    errno = 0;
-    while (msgrcv(msq_match,&b_mess,msgsize,a_mess.partner,IPC_NOWAIT) == -1 && errno == EINTR) {
-      errno = 0;
-    }
+    while (msgrcv(msq_match,&b_mess,msgsize,a_mess.partner,IPC_NOWAIT) == -1 && errno == EINTR) continue;
     // Il messaggio e' stato ricevuto
-    //controlla la validita' dei messaggi
-    debug_info = 3;
+    // controlla la validita' dei messaggi
     if (a_mess.pid != b_mess.partner || b_mess.pid != a_mess.partner) {
       debug(0);
     }
     // controlla che i processi siano ancora vivi
     if (kill(a_mess.pid,0) + kill(b_mess.pid,0) < 0) { // uno e' terminato
       // Uno dei due processi e' stato ucciso da birth_death
-      // prima della ricezione del messaggio di A
       // Restarta il processo in pausa.
       printf("Uno dei processi e' terminato\n");
       kill(a_mess.pid,SIGUSR1);
       kill(b_mess.pid,SIGUSR1);
       a_matching = 0;
       b_matching = 0;
-      debug_info = 4;
     } else {  // sono entrambi vivi
       // segnala ai processi di terminare
       kill(b_mess.pid,SIGTERM);
       kill(a_mess.pid,SIGTERM);
-      debug_info = 5;
       // li accoppia
       accoppia(a_mess.pid,a_mess.partner);
-      debug_info = 6;
     }
     i++;
   }
@@ -493,17 +545,17 @@ void debug(int sig) {
   print_all_shm(shmptr);
   message x;
   printf("\nmsq_start:\n");
-  while (msgrcv(msq_start,&x,msgsize,0,IPC_NOWAIT) == 0 || errno == EINTR) {
+  while (msgrcv(msq_start,&x,msgsize,0,IPC_NOWAIT) != -1 || errno == EINTR) {
     if (errno == EINTR) continue;
     print_message(&x);
   }
   printf("\nmsq_match:\n");
-  while (msgrcv(msq_match,&x,msgsize,0,IPC_NOWAIT) == 0 || errno == EINTR) {
+  while (msgrcv(msq_match,&x,msgsize,0,IPC_NOWAIT) != -1 || errno == EINTR) {
     if (errno == EINTR) continue;
     print_message(&x);
   }
   printf("\nmsq_contact:\n");
-  while (msgrcv(msq_contact,&x,msgsize,0,IPC_NOWAIT) == 0 || errno == EINTR) {
+  while (msgrcv(msq_contact,&x,msgsize,0,IPC_NOWAIT) != -1 || errno == EINTR) {
     if (errno == EINTR) continue;
     print_message(&x);
   }
@@ -589,9 +641,7 @@ void init() {
   }
   add_func("init");
   // gestione segnali
-  debug_info = 1;
   set_signals();
-  debug_info = 2;
   // Inizializza le variabili a 0
   a_matching = 0;
   b_matching = 0;
@@ -599,26 +649,19 @@ void init() {
   matches = 0;
   // Definisce il tempo iniziale
   gettimeofday(&start_time,NULL);
-  debug_info = 3;
   // Apre il file urandom
   urandom = fopen("/dev/urandom", "r");
-  debug_info = 4;
   // Crea le code di messaggi
   msq_init();
-  debug_info = 5;
   msgsize = sizeof(message)-sizeof(long);
   // Inizializza la memoria condivisa
   shm_init();
-  debug_info = 6;
   // Definisce i percorsi degli eseguibili
   char* dir = getenv("PWD");
-  debug_info = 7;
   a_path = malloc(strlen(dir)+6);
   b_path = malloc(strlen(dir)+6);
-  debug_info = 8;
   sprintf(a_path,"%s/bin/a",dir);
   sprintf(b_path,"%s/bin/b",dir);
-  debug_info = 9;
   // Inizializza le liste di persone
   a_people = init_people();
   b_people = init_people();
@@ -626,7 +669,6 @@ void init() {
 }
 
 int main(int argc, char* argv[]) {
-  printf("%d\n",argc);
   INIT_PEOPLE = strtoul(argv[1],NULL,10);
   GENES = strtoul(argv[2],NULL,10);
   BIRTH_DEATH = strtoul(argv[3],NULL,10);

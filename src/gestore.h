@@ -15,6 +15,7 @@ void accoppia(int a, int b);
 void empty_queue(person* p);
 void wait_for_messages();
 void birth_death(int sig);
+void end_match(person* p);
 void kill_all();
 void kill_person(person* p);
 void segnala_start(person* p);

@@ -5,6 +5,7 @@
 #include <sys/msg.h>
 #include <string.h>
 #include <errno.h>
+#include <sys/time.h>
 #include "header.h"
 #include "child.h"
 #include "type_a.h"
@@ -18,6 +19,7 @@ char* nome;
 unsigned int INIT_PEOPLE;
 // pid del partner accoppiato
 int partner;
+int match_phase;
 
 // mcd target
 unsigned long target;
@@ -62,7 +64,6 @@ void push_contact(unsigned int id) {
 // accetta il processo B e si accoppia
 void accetta(pid_t pid) {
   add_func("accetta");
-  partner = pid;
   message s;
   s.data = 1;
   s.mtype = pid;
@@ -70,16 +71,21 @@ void accetta(pid_t pid) {
   s.partner = pid;
   // Messaggio di assenso al processo B
   while (msgsnd(msq_contact,&s,msgsize,0) == -1 && errno == EINTR) continue;
+  // Seconda fase di match
+  match_phase = 2;
   // Attende il messaggio di conferma di B
   message r;
   while (msgrcv(msq_match,&r,msgsize,getpid(),0) == -1 && errno == EINTR) continue;
+  // terza fase di match
+  match_phase = 3;
   if (r.data) { // B ha confermato
     // Messaggio per il gestore
     s.mtype = getppid();
     while (msgsnd(msq_match,&s,msgsize,0) == -1 && errno == EINTR) continue;
-  } else { // B e' stato ucciso quindi il gestore ha risposto al suo posto
-    printf("A %d B ucciso\n",getpid());
+  } else {// se B non conferma vuol dire che e' stato ucciso
+    return;
   }
+  match_phase = 0;
   pause();
   printf("A %d riprende esecuzione\n",getpid());
   partner = 0;
@@ -100,23 +106,23 @@ void rifiuta(pid_t pid) {
 void ascolta() {
   add_func("ascolta");
   message r;
-  message s;
   while (1) {
     // ricevo il messaggio
-    debug_info = 1;
     while (msgrcv(msq_contact,&r,msgsize,getpid(),0) == -1 && errno == EINTR) continue;
+    partner = r.pid;
+    // prima fase di match
+    match_phase = 1;
     if (mcd(genoma,r.genoma) >= target) { // l'mcd corrisponde al target
-      debug_info = 2;
       accetta(r.pid);
     } else {
-      debug_info = 3;
       rifiuta(r.pid);
-      debug_info = 4;
       push_contact(r.id);
     }
+    match_phase = 0;
   }
   rm_func();
 }
+
 
 void debug(int sig) {
   printf("\n%s ",strsignal(sig));
@@ -125,7 +131,7 @@ void debug(int sig) {
     printf("%s, ",stack[i]);
   }
   printf("]}\n");
-  quit(0);
+  quit(sig);
 }
 
 void init() {
@@ -145,6 +151,13 @@ void init() {
 }
 
 void quit(int sig) {
+  if (sig == SIGTERM) { // manda il messaggio per end_match()
+    message m;
+    m.mtype = getpid();
+    m.data = match_phase;
+    m.partner = partner;
+    msgsnd(msq_start,&m,msgsize,0);
+  }
   exit(EXIT_SUCCESS);
 }
 

@@ -11,7 +11,6 @@
 #include "child.h"
 #include "type_b.h"
 
-
 // Proprie caratteristiche
 unsigned long genoma;
 char* nome;
@@ -21,6 +20,7 @@ unsigned int INIT_PEOPLE;
 
 // pid del partner accoppiato
 int partner;
+int match_phase;
 
 // Array degli ID dei processi A gia' contattati
 unsigned int* black_list;
@@ -96,6 +96,7 @@ void accoppia(pid_t pid) {
   s.data = 1;
   while (msgsnd(msq_match,&s,msgsize,0) == -1 && errno == EINTR) continue;
   // Attende il segnale di terminazione
+  match_phase = 0;
   pause();
   partner = 0;
   printf("B %d riprende esecuzione\n",getpid());
@@ -111,7 +112,9 @@ char contatta(pid_t pid) {
   s.genoma = genoma;
   s.id = id;
   while (msgsnd(msq_contact,&s,msgsize,0) == -1 && errno == EINTR) continue;
+  match_phase = 1;
   while (msgrcv(msq_contact,&r,msgsize,getpid(),0) == -1 && errno == EINTR) continue;
+  match_phase = r.data ? 2 : 0;
   rm_func();
   return r.data;
 }
@@ -123,7 +126,8 @@ void cerca_target() {
   // contatta ogni A per cui l'MCD dei genomi sia >= al target
   for (int i = 0; i < length;i++) {
     if (a[i].valid && mcd(genoma,a[i].genoma) >= target && not_black_list(a[i].id)) {
-      if (!contatta(a[i].pid)) { // se viene rifiutato aggiunge il processo A nella black_list
+      partner = a[i].pid;
+      if (!contatta(partner)) { // se viene rifiutato aggiunge il processo A nella black_list
         black_list[black_list_length++] = a[i].id;
       } else { // altrimenti si accoppia
         accoppia(a[i].pid);
@@ -153,7 +157,8 @@ void init() {
     stack[i] = malloc(64);
   }
   add_func("init");
-  black_list = malloc(INIT_PEOPLE);
+  black_list = malloc(sizeof(INIT_PEOPLE) * INIT_PEOPLE);
+  black_list_length = 0;
   set_signals(quit,debug);
   // le code di messaggi
   msq_init();
@@ -165,6 +170,13 @@ void init() {
 }
 
 void quit(int sig) {
+  if (sig == SIGTERM) { // manda il messaggio per end_match()
+    message m;
+    m.mtype = getpid();
+    m.data = match_phase;
+    m.partner = partner;
+    msgsnd(msq_start,&m,msgsize,0);
+  }
   shm_detach();
   exit(EXIT_SUCCESS);
 }
@@ -178,12 +190,12 @@ void start() {
 
 void debug(int sig) {
   printf("\n%s ",strsignal(sig));
-  printf("%d {type: B, info: %d, target: %lu, genoma: %lu, partner: %d stack: [",getpid(),debug_info,target,genoma,partner);
+  printf("%d {type: B, info: %d, target: %lu, genoma: %lu, partner: %d, stack: [",getpid(),debug_info,target,genoma,partner);
   for (int i = 0; i < stack_length;i++) {
     printf("%s, ",stack[i]);
   }
   printf("]}\n");
-  quit(0);
+  quit(sig);
 }
 
 int main(int argc, char* argv[]) {
