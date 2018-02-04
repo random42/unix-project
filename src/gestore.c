@@ -485,19 +485,6 @@ void debug(int sig) {
   printf("]\n\nInfo: %d\n",debug_info);
   printf("\nStato memoria condivisa\n");
   print_all_shm(shmptr);
-  message x;
-  printf("\nmsq_start:\n");
-  while (msgrcv(msq_start,&x,msgsize,0,IPC_NOWAIT) != 1) {
-    print_message(&x);
-  }
-  printf("\nmsq_match:\n");
-  while (msgrcv(msq_match,&x,msgsize,0,IPC_NOWAIT) != 1) {
-    print_message(&x);
-  }
-  printf("\nmsq_contact:\n");
-  while (msgrcv(msq_contact,&x,msgsize,0,IPC_NOWAIT) != 1) {
-    print_message(&x);
-  }
   printf("\n");
   people_for_each(a_people,debug_person);
   people_for_each(b_people,debug_person);
