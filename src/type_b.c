@@ -153,7 +153,7 @@ void init() {
     stack[i] = malloc(64);
   }
   add_func("init");
-  black_list = malloc(INIT_PEOPLE);
+  black_list = malloc(sizeof(int)*INIT_PEOPLE);
   set_signals(quit,debug);
   // le code di messaggi
   msq_init();
