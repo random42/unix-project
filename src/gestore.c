@@ -346,22 +346,18 @@ void wait_for_messages() {
   int max_match = 1000;
   int i = 0;
   while (1) {
-    debug_info = -1;
     // Riceve il messaggio di un processo A
     while (msgrcv(msq_match,&a_mess,msgsize,getpid(),0) == -1 && errno == EINTR) continue;
     // Segnala a_mess birth_death che i processi sono in fase di matching
     a_matching = a_mess.pid;
     b_matching = a_mess.partner;
-    debug_info = 1;
     // Riceve il messaggio del processo B con IPC_NOWAIT
-    debug_info = 2;
     errno = 0;
     while (msgrcv(msq_match,&b_mess,msgsize,a_mess.partner,IPC_NOWAIT) == -1 && errno == EINTR) {
       errno = 0;
     }
     // Il messaggio e' stato ricevuto
     //controlla la validita' dei messaggi
-    debug_info = 3;
     if (a_mess.pid != b_mess.partner || b_mess.pid != a_mess.partner) {
       debug(0);
     }
@@ -375,15 +371,12 @@ void wait_for_messages() {
       kill(b_mess.pid,SIGUSR1);
       a_matching = 0;
       b_matching = 0;
-      debug_info = 4;
     } else {  // sono entrambi vivi
       // segnala ai processi di terminare
       kill(b_mess.pid,SIGTERM);
       kill(a_mess.pid,SIGTERM);
-      debug_info = 5;
       // li accoppia
       accoppia(a_mess.pid,a_mess.partner);
-      debug_info = 6;
     }
     i++;
   }
@@ -493,25 +486,22 @@ void debug(int sig) {
   print_all_shm(shmptr);
   message x;
   printf("\nmsq_start:\n");
-  while (msgrcv(msq_start,&x,msgsize,0,IPC_NOWAIT) == 0 || errno == EINTR) {
-    if (errno == EINTR) continue;
+  while (msgrcv(msq_start,&x,msgsize,0,IPC_NOWAIT) != 1) {
     print_message(&x);
   }
   printf("\nmsq_match:\n");
-  while (msgrcv(msq_match,&x,msgsize,0,IPC_NOWAIT) == 0 || errno == EINTR) {
-    if (errno == EINTR) continue;
+  while (msgrcv(msq_match,&x,msgsize,0,IPC_NOWAIT) != 1) {
     print_message(&x);
   }
   printf("\nmsq_contact:\n");
-  while (msgrcv(msq_contact,&x,msgsize,0,IPC_NOWAIT) == 0 || errno == EINTR) {
-    if (errno == EINTR) continue;
+  while (msgrcv(msq_contact,&x,msgsize,0,IPC_NOWAIT) != 1) {
     print_message(&x);
   }
   printf("\n");
   people_for_each(a_people,debug_person);
   people_for_each(b_people,debug_person);
   sleep(1);
-  quit(0);
+  quit(sig);
 }
 
 void debug_person(person* p) {
@@ -626,7 +616,6 @@ void init() {
 }
 
 int main(int argc, char* argv[]) {
-  printf("%d\n",argc);
   INIT_PEOPLE = strtoul(argv[1],NULL,10);
   GENES = strtoul(argv[2],NULL,10);
   BIRTH_DEATH = strtoul(argv[3],NULL,10);

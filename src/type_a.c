@@ -18,6 +18,7 @@ char* nome;
 unsigned int INIT_PEOPLE;
 // pid del partner accoppiato
 int partner;
+int match_phase;
 
 // mcd target
 unsigned long target;
@@ -70,9 +71,11 @@ void accetta(pid_t pid) {
   s.partner = pid;
   // Messaggio di assenso al processo B
   while (msgsnd(msq_contact,&s,msgsize,0) == -1 && errno == EINTR) continue;
+  match_phase = 2;
   // Attende il messaggio di conferma di B
   message r;
   while (msgrcv(msq_match,&r,msgsize,getpid(),0) == -1 && errno == EINTR) continue;
+  match_phase = 3;
   if (r.data) { // B ha confermato
     // Messaggio per il gestore
     s.mtype = getppid();
@@ -80,9 +83,9 @@ void accetta(pid_t pid) {
   } else { // B e' stato ucciso quindi il gestore ha risposto al suo posto
     printf("A %d B ucciso\n",getpid());
   }
+  match_phase = 0;
   pause();
   printf("A %d riprende esecuzione\n",getpid());
-  partner = 0;
   rm_func();
 }
 
@@ -100,20 +103,18 @@ void rifiuta(pid_t pid) {
 void ascolta() {
   add_func("ascolta");
   message r;
-  message s;
   while (1) {
     // ricevo il messaggio
-    debug_info = 1;
     while (msgrcv(msq_contact,&r,msgsize,getpid(),0) == -1 && errno == EINTR) continue;
+    partner = r.pid;
+    match_phase = 1;
     if (mcd(genoma,r.genoma) >= target) { // l'mcd corrisponde al target
-      debug_info = 2;
       accetta(r.pid);
     } else {
-      debug_info = 3;
       rifiuta(r.pid);
-      debug_info = 4;
       push_contact(r.id);
     }
+    match_phase = 0;
   }
   rm_func();
 }
@@ -125,7 +126,7 @@ void debug(int sig) {
     printf("%s, ",stack[i]);
   }
   printf("]}\n");
-  quit(0);
+  quit(sig);
 }
 
 void init() {

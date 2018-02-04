@@ -21,6 +21,7 @@ unsigned int INIT_PEOPLE;
 
 // pid del partner accoppiato
 int partner;
+int match_phase;
 
 // Array degli ID dei processi A gia' contattati
 unsigned int* black_list;
@@ -95,6 +96,7 @@ void accoppia(pid_t pid) {
   s.mtype = pid;
   s.data = 1;
   while (msgsnd(msq_match,&s,msgsize,0) == -1 && errno == EINTR) continue;
+  match_phase = 0;
   // Attende il segnale di terminazione
   pause();
   partner = 0;
@@ -111,7 +113,9 @@ char contatta(pid_t pid) {
   s.genoma = genoma;
   s.id = id;
   while (msgsnd(msq_contact,&s,msgsize,0) == -1 && errno == EINTR) continue;
+  match_phase = 1;
   while (msgrcv(msq_contact,&r,msgsize,getpid(),0) == -1 && errno == EINTR) continue;
+  match_phase = r.data ? 2 : 0;
   rm_func();
   return r.data;
 }
@@ -123,7 +127,8 @@ void cerca_target() {
   // contatta ogni A per cui l'MCD dei genomi sia >= al target
   for (int i = 0; i < length;i++) {
     if (a[i].valid && mcd(genoma,a[i].genoma) >= target && not_black_list(a[i].id)) {
-      if (!contatta(a[i].pid)) { // se viene rifiutato aggiunge il processo A nella black_list
+      partner = a[i].pid;
+      if (!contatta(partner)) { // se viene rifiutato aggiunge il processo A nella black_list
         black_list[black_list_length++] = a[i].id;
       } else { // altrimenti si accoppia
         accoppia(a[i].pid);
@@ -183,7 +188,7 @@ void debug(int sig) {
     printf("%s, ",stack[i]);
   }
   printf("]}\n");
-  quit(0);
+  quit(sig);
 }
 
 int main(int argc, char* argv[]) {
