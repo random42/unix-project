@@ -117,7 +117,7 @@ I primi 4 byte sono un intero che descrive la lunghezza dell'array di persone A.
 
 File: *sem.c*
 
-Vi sono due semafori *init_people* elementi ciascuno, ogni elemento associato a un processo A o B attivo:
+Vi sono due semafori con *init_people* elementi ciascuno, ogni elemento associato a un processo A o B attivo:
 
 *sem_start*: Per il segnale di pronto (A|B), start (dal Gestore) o di continuazione nel caso in cui uno dei due processi accoppiati termina.
 
@@ -167,7 +167,7 @@ Dopo aver inizializzato le proprie strutture, i processi figli segnalano di esse
 #### cerca() / ascolta()
 Per massimizzare il genoma dei nuovi processi, sia gli individui A che gli individui B contattano e accettano tramite *target*. La variabile assume il valore dei propri divisori in ordine decrescente.
 
-A ogni ciclo di *cerca()* il processo B scorre i processi A nella memoria condivisa e contatta quelli per cui l'mcd tra i genomi sia >= al target scelto. A ogni rifiuto aggiungono l'id del processo A a una *black_list*, in modo da non contattarlo nuovamente. Dopo ogni ciclo il target si abbassa, fino al raggiungimento di 1. Il ciclo successivo il target ritorna al massimo divisore (il genoma) e la black list viene cancellata.
+A ogni ciclo di *cerca()* il processo B scorre i processi A nella memoria condivisa e contatta quelli per cui l'mcd tra i genomi sia >= al target scelto. A ogni rifiuto aggiunge l'id del processo A a una *black_list*, in modo da non contattarlo nuovamente. Dopo ogni ciclo il target si abbassa, fino al raggiungimento di 1. Il ciclo successivo il target ritorna al massimo divisore (il genoma) e la black list viene cancellata.
 
 A ogni ciclo di *ascolta()* il processo A riceve un messaggio di contatto e decide di accettarlo in base al proprio target. Dopo *init_people* rifiuti, il processo A abbassa il target.
 
