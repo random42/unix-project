@@ -7,11 +7,16 @@
 #include <errno.h>
 #include "header.h"
 #include "child.h"
+#include "sem.h"
 
 extern int msq_match;
-extern int msq_start;
 extern int msq_contact;
 extern int msgsize;
+
+extern short sem_num;
+
+extern int sem_start;
+extern int sem_match;
 
 extern char* stack[];
 extern int stack_length;
@@ -67,31 +72,22 @@ void set_signals(void(quit)(int),void(debug)(int)) {
   // Handler interrompibile
   sigemptyset(&sig_do_nothing.sa_mask);
   // Setta gli handler dei segnali
-  signal(SIGTERM,quit);
-  if (sigaction(SIGUSR1,&sig_do_nothing,NULL) == -1) {
-    printf("SIGUSR1 sigaction failed\n");
-    quit(0);
-  }
-  if (sigaction(SIGUSR2,&sig_debug,NULL) == -1) {
-    printf("SIGUSR2 sigaction failed\n");
-    quit(0);
-  }
-  if (sigaction(SIGSEGV,&sig_debug,NULL) == -1) {
-    printf("SIGSEGV sigaction failed\n");
-    quit(0);
-  }
-  if (sigaction(SIGABRT,&sig_debug,NULL) == -1) {
-    printf("SIGABRT sigaction failed\n");
-    quit(0);
-  }
-  if (sigaction(SIGILL,&sig_debug,NULL) == -1) {
-    printf("SIGILL sigaction failed\n");
-    quit(0);
-  }
-  if (sigaction(SIGINT,&sig_ignore,NULL) == -1) {
-    printf("SIGINT sigaction failed\n");
-    quit(0);
-  }
+  sigaction(SIGTERM,&sig_term,NULL);
+  sigaction(SIGALRM,&sig_do_nothing,NULL);
+  sigaction(SIGUSR2,&sig_debug,NULL);
+  sigaction(SIGSEGV,&sig_debug,NULL);
+  sigaction(SIGABRT,&sig_debug,NULL);
+  sigaction(SIGILL,&sig_debug,NULL);
+  sigaction(SIGINT,&sig_ignore,NULL);
+  rm_func();
+}
+
+void fine_match() {
+  add_func("fine_match");
+  // segnalano di aver finito il match
+  add_match(sem_num,-1);
+  // riprendono l'esecuzione se il gestore aumenta il semaforo
+  add_start(sem_num,-1);
   rm_func();
 }
 
@@ -99,9 +95,6 @@ void msq_init() {
   add_func("msq_init");
   msgsize = sizeof(message)-sizeof(unsigned long);
   if ((msq_match = msgget(MSG_MATCH,0)) == -1) {
-    raise(SIGTERM);
-  }
-  if ((msq_start = msgget(MSG_START,0)) == -1) {
     raise(SIGTERM);
   }
   if ((msq_contact = msgget(MSG_CONTACT,0)) == -1) {
@@ -112,9 +105,7 @@ void msq_init() {
 
 void ready() {
   add_func("ready");
-  message m;
-  m.mtype = getpid();
-  while (msgsnd(msq_start,&m,msgsize,0) == -1 && errno == EINTR) continue;
-  pause();
+  add_start(sem_num,-1);
+  add_start(sem_num,-1);
   rm_func();
 }

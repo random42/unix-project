@@ -8,18 +8,20 @@
 #include <errno.h>
 #include "header.h"
 #include "child.h"
+#include "sem.h"
 #include "type_a.h"
 
 
 
 // Proprie caratteristiche
+unsigned int id;
 unsigned long genoma;
 char* nome;
+short sem_num;
 
 unsigned int INIT_PEOPLE;
 // pid del partner accoppiato
 int partner;
-int match_phase;
 
 // mcd target
 unsigned long target;
@@ -32,9 +34,11 @@ unsigned long* divisori;
 int div_length;
 
 int msq_match;
-int msq_start;
 int msq_contact;
 int msgsize;
+
+int sem_start;
+int sem_match;
 
 char* stack[64];
 int stack_length;
@@ -72,11 +76,9 @@ void accetta(pid_t pid) {
   s.partner = pid;
   // Messaggio di assenso al processo B
   while (msgsnd(msq_contact,&s,msgsize,0) == -1 && errno == EINTR) continue;
-  match_phase = 2;
   // Attende il messaggio di conferma di B
   message r;
   while (msgrcv(msq_match,&r,msgsize,getpid(),0) == -1 && errno == EINTR) continue;
-  match_phase = 3;
   if (r.data) { // B ha confermato
     // Messaggio per il gestore
     s.mtype = getppid();
@@ -84,9 +86,7 @@ void accetta(pid_t pid) {
   } else { // B e' stato ucciso quindi il gestore ha risposto al suo posto
     printf("A %d B ucciso\n",getpid());
   }
-  match_phase = 0;
-  pause();
-  printf("A %d riprende esecuzione\n",getpid());
+  fine_match();
   rm_func();
 }
 
@@ -107,22 +107,22 @@ void ascolta() {
   while (1) {
     // ricevo il messaggio
     while (msgrcv(msq_contact,&r,msgsize,getpid(),0) == -1 && errno == EINTR) continue;
+    add_match(sem_num,1);
     partner = r.pid;
-    match_phase = 1;
     if (mcd(genoma,r.genoma) >= target) { // l'mcd corrisponde al target
       accetta(r.pid);
     } else {
       rifiuta(r.pid);
+      add_match(sem_num,-1);
       push_contact(r.id);
     }
-    match_phase = 0;
   }
   rm_func();
 }
 
 void debug(int sig) {
   printf("\n%s ",strsignal(sig));
-  printf("%d {type: A, info: %d, target: %lu, genoma: %lu, partner: %d stack: [",getpid(),debug_info,target,genoma,partner);
+  printf("%d {type: A, info: %d, target: %lu, genoma: %lu, partner: %d, sem: %hi, stack: [",getpid(),debug_info,target,genoma,partner,sem_num);
   for (int i = 0; i < stack_length;i++) {
     printf("%s, ",stack[i]);
   }
@@ -137,6 +137,7 @@ void init() {
   }
   add_func("init");
   set_signals(quit,debug);
+  sem_init();
   // le code di messaggi
   msq_init();
   // cerca i divisori
@@ -147,17 +148,6 @@ void init() {
 }
 
 void quit(int sig) {
-  signal(SIGTERM,quit);
-  printf("%d\n",getpid());
-  if (sig == SIGTERM) { // manda il messaggio per end_match()
-    message m;
-    m.mtype = getpid();
-    m.data = match_phase;
-    m.partner = partner;
-    printf("Pid: %d\tmtype: %lu\tpartner: %d\tdata: %d\n",m.pid,m.mtype,m.partner,m.data);
-    msgsnd(msq_start,&m,msgsize,0);
-    if (match_phase) {return;}
-  }
   exit(EXIT_SUCCESS);
 }
 
@@ -170,7 +160,9 @@ void start() {
 int main(int argc, char* argv[]) {
   nome = argv[1];
   genoma = strtoul(argv[2],NULL,10);
-  INIT_PEOPLE = strtoul(argv[3],NULL,10);
+  id = strtoul(argv[3],NULL,10);
+  sem_num = strtoul(argv[4],NULL,10);
+  INIT_PEOPLE = strtoul(argv[5],NULL,10);
   init();
   // Segnala al gestore di essere pronto e attende lo start
   ready();
