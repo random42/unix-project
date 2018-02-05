@@ -13,6 +13,7 @@
 #include <errno.h>
 #include "header.h"
 #include "gestore.h"
+#include "sem.h"
 #include "shm.h"
 
 FILE* urandom;
@@ -51,6 +52,9 @@ char* a_path;
 char* b_path;
 // Tempo iniziale
 struct timeval start_time;
+
+int sem_start;
+int sem_match;
 
 int shmid;
 void* shmptr;
@@ -652,6 +656,8 @@ void quit(int sig) {
   msgctl(msq_match,IPC_RMID,NULL);
   msgctl(msq_start,IPC_RMID,NULL);
   msgctl(msq_contact,IPC_RMID,NULL);
+  // cancella i semafori
+  sem_destroy();
   // chiude il file urandom
   fclose(urandom);
   // exit
@@ -678,6 +684,8 @@ void init() {
   // Crea le code di messaggi
   msq_init();
   msgsize = sizeof(message)-sizeof(long);
+  // Crea i semafori
+  sem_create();
   // Inizializza la memoria condivisa
   shm_init();
   // Definisce i percorsi degli eseguibili
@@ -698,5 +706,8 @@ int main(int argc, char* argv[]) {
   BIRTH_DEATH = strtoul(argv[3],NULL,10);
   SIM_TIME = strtoul(argv[4],NULL,10);
   init();
-  start();
+  //start();
+  print_sem_start();
+  print_sem_match();
+  quit(0);
 }

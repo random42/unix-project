@@ -8,6 +8,7 @@
 #include <errno.h>
 #include "header.h"
 #include "child.h"
+#include "sem.h"
 #include "type_a.h"
 
 
@@ -35,6 +36,9 @@ int msq_match;
 int msq_start;
 int msq_contact;
 int msgsize;
+
+int sem_start;
+int sem_match;
 
 char* stack[64];
 int stack_length;

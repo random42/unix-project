@@ -10,6 +10,7 @@
 #include "header.h"
 #include "shm.h"
 #include "child.h"
+#include "sem.h"
 #include "type_b.h"
 
 
@@ -39,6 +40,9 @@ int msq_match;
 int msq_start;
 int msq_contact;
 int msgsize;
+
+int sem_start;
+int sem_match;
 
 int shmid;
 void* shmptr;
