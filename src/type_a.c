@@ -22,7 +22,6 @@ short sem_num;
 unsigned int INIT_PEOPLE;
 // pid del partner accoppiato
 int partner;
-int match_phase;
 
 // mcd target
 unsigned long target;
@@ -35,7 +34,6 @@ unsigned long* divisori;
 int div_length;
 
 int msq_match;
-int msq_start;
 int msq_contact;
 int msgsize;
 
@@ -78,11 +76,9 @@ void accetta(pid_t pid) {
   s.partner = pid;
   // Messaggio di assenso al processo B
   while (msgsnd(msq_contact,&s,msgsize,0) == -1 && errno == EINTR) continue;
-  match_phase = 2;
   // Attende il messaggio di conferma di B
   message r;
   while (msgrcv(msq_match,&r,msgsize,getpid(),0) == -1 && errno == EINTR) continue;
-  match_phase = 3;
   if (r.data) { // B ha confermato
     // Messaggio per il gestore
     s.mtype = getppid();
@@ -91,7 +87,6 @@ void accetta(pid_t pid) {
     printf("A %d B ucciso\n",getpid());
   }
   fine_match();
-  printf("A %d riprende esecuzione\n",getpid());
   rm_func();
 }
 
@@ -114,7 +109,6 @@ void ascolta() {
     while (msgrcv(msq_contact,&r,msgsize,getpid(),0) == -1 && errno == EINTR) continue;
     add_match(sem_num,1);
     partner = r.pid;
-    match_phase = 1;
     if (mcd(genoma,r.genoma) >= target) { // l'mcd corrisponde al target
       accetta(r.pid);
     } else {

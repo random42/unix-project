@@ -24,7 +24,6 @@ unsigned int INIT_PEOPLE;
 
 // pid del partner accoppiato
 int partner;
-int match_phase;
 
 // Array degli ID dei processi A gia' contattati
 unsigned int* black_list;
@@ -38,7 +37,6 @@ int div_length;
 unsigned long target;
 
 int msq_match;
-int msq_start;
 int msq_contact;
 int msgsize;
 
@@ -103,7 +101,6 @@ void accoppia(pid_t pid) {
   s.data = 1;
   while (msgsnd(msq_match,&s,msgsize,0) == -1 && errno == EINTR) continue;
   fine_match();
-  printf("B %d riprende esecuzione\n",getpid());
   rm_func();
 }
 
@@ -115,11 +112,19 @@ char contatta(pid_t pid) {
   s.pid = getpid();
   s.genoma = genoma;
   s.id = id;
-  while (msgsnd(msq_contact,&s,msgsize,0) == -1 && errno == EINTR) continue;
+  while (msgsnd(msq_contact,&s,msgsize,0) == -1) continue;
   add_match(sem_num,1);
-  while (msgrcv(msq_contact,&r,msgsize,getpid(),0) == -1 && errno == EINTR) continue;
-  rm_func();
-  return r.data;
+  // Manda il segnale nel caso contattasse un processo morto
+  alarm(1);
+  int ricevuto = msgrcv(msq_contact,&r,msgsize,getpid(),0);
+  if (ricevuto) {
+    alarm(0); // disattiva il segnale
+    rm_func();
+    return r.data;
+  } else {
+    rm_func();
+    return 0;
+  }
 }
 
 void cerca_target() {

@@ -109,18 +109,25 @@ void print_sem_start() {
   rm_func();
 }
 
-void wait_match(short num) {
+int wait_match(short num) {
+  add_func("wait_match");
   struct sembuf s;
   s.sem_num = num;
   s.sem_op = 0;
-  while (semop(sem_match,&s,1) == -1 && errno == EINTR) continue;
+  s.sem_flg = IPC_NOWAIT;
+  int status;
+  while ((status = semop(sem_match,&s,1)) == -1 && errno == EINTR) continue;
+  return status;
+  rm_func();
 }
 
 void wait_start(short num) {
+  add_func("wait_start");
   struct sembuf s;
   s.sem_num = num;
   s.sem_op = 0;
   while (semop(sem_start,&s,1) == -1 && errno == EINTR) continue;
+  rm_func();
 }
 
 void add_match(short num, short op) {
@@ -142,13 +149,17 @@ void add_start(short num, short op) {
 }
 
 void set_all(int id, short num) {
+  add_func("set_all");
   unsigned short a[INIT_PEOPLE];
   for (short i = 0;i < INIT_PEOPLE;i++) {
     a[i] = num;
   }
   while (semctl(id,0,SETALL,a) == -1 && errno == EINTR) continue;
+  rm_func();
 }
 
 void set_one(int id, short sem, short num) {
+  add_func("set_all");
   while (semctl(id,sem,SETVAL,num) == -1 && errno == EINTR) continue;
+  rm_func();
 }

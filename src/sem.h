@@ -8,7 +8,7 @@ void sem_destroy();
 void sem_init();
 void print_sem_match();
 void print_sem_start();
-void wait_match(short num);
+int wait_match(short num);
 void wait_start(short num);
 void add_match(short num, short op);
 void add_start(short num, short op);

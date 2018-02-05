@@ -38,6 +38,9 @@ message b_mess;
 // Timer per birth_death
 struct itimerval timer;
 
+// Vale 1 in una sezione critica in cui birth_death non puo' avvenire
+int not;
+
 // Persone totali create
 unsigned int total;
 unsigned int total_a;
@@ -53,23 +56,26 @@ char* b_path;
 // Tempo iniziale
 struct timeval start_time;
 
+// semafori
 int sem_start;
 int sem_match;
 
+// memoria condivisa
 int shmid;
 void* shmptr;
 
+// code di messaggi
 int msq_match;
-int msq_start;
 int msq_contact;
 int msgsize;
 
+// debug
 char* stack[64];
 int stack_length;
 int debug_info;
 
 
-/* Guess what */
+/* Massimo comune divisore */
 unsigned long mcd(unsigned long a, unsigned long b) {
   unsigned long r;
   while (a % b != 0) {
@@ -116,9 +122,6 @@ void msq_init() {
   if ((msq_match = msgget(MSG_MATCH,IPC_CREAT /* | IPC_EXCL */ | 0600)) == -1) {
     printf("Failed to create message queue.\n");
   }
-  if ((msq_start = msgget(MSG_START,IPC_CREAT /* | IPC_EXCL */ | 0600)) == -1) {
-    printf("Failed to create message queue.\n");
-  }
   if ((msq_contact = msgget(MSG_CONTACT,IPC_CREAT /* | IPC_EXCL */ | 0600)) == -1) {
     printf("Failed to create message queue.\n");
   }
@@ -157,6 +160,7 @@ void print_info() {
   rm_func();
 }
 
+
 void print_final_info() {
   print_info();
   printf("Individui A creati: %u\n",total_a);
@@ -172,34 +176,36 @@ void print_final_info() {
 }
 
 
-/* Ritorna il processo con genoma minimo o NULL nel caso
-speciale in cui gli individui esistenti siano 2 */
+/* Sceglie una persona casuale che non sia in fase di match */
 person* choose_victim() {
   add_func("choose_victim");
-  if (a_people->length + b_people->length == 2) {
-    return NULL;
-  }
-  node* n = a_people->first;
+  int length = a_people->length + b_people->length;
+  unsigned int index;
+  fread(&index, sizeof(unsigned int), 1, urandom);
+  index = index % length;
   person* p;
-  // Un minimo iniziale maggiore di tutti i genomi
-  unsigned long min = GENES*GENES;
-  for (int i = 0;i < a_people->length;i++) {
-    if (n->elem->genoma < min && n->elem->pid != a_matching) {
-      p = n->elem;
-      min = p->genoma;
+  node* n;
+  if (index >= a_people->length) { // itera su B
+    index -= a_people->length;
+    n = b_people->first;
+    for (int i = 0;i < index;i++) {
+      n = n->next;
     }
-    n = n->next;
-  }
-  n = b_people->first;
-  for (int i = 0;i < b_people->length;i++) {
-    if (n->elem->genoma < min && n->elem->pid != b_matching) {
-      p = n->elem;
-      min = p->genoma;
+  } else { // itera su A
+    n = a_people->first;
+    for (int i = 0;i < index;i++) {
+      n = n->next;
     }
-    n = n->next;
   }
-  rm_func();
-  return p;
+  p = n->elem;
+  if (p->pid == a_matching || p->pid == b_matching || wait_match(p->sem) == -1) {
+    rm_func();
+    return choose_victim();
+  } else {
+    debug_info = p->pid;
+    rm_func();
+    return p;
+  }
 }
 
 /*
@@ -265,13 +271,13 @@ e aggiunge la persona nella memoria condivisa se e' di tipo A */
 void gen_child(person* p) {
   add_func("gen_child");
   // argomenti dell'exec
-  char* genoma = malloc(32);
+  char* genoma = malloc(64);
   sprintf(genoma,"%lu",p->genoma);
-  char* id = malloc(32);
+  char* id = malloc(64);
   sprintf(id,"%u",p->id);
-  char* sem_num = malloc(32);
+  char* sem_num = malloc(64);
   sprintf(sem_num,"%hi",p->sem);
-  char* people = malloc(32);
+  char* people = malloc(64);
   sprintf(people,"%u",INIT_PEOPLE);
   // fork
   pid_t child = fork();
@@ -297,7 +303,7 @@ void gen_child(person* p) {
 }
 
 
-/* Riceve i pid dei processi accoppiati, pulisce le loro strutture e
+/* Riceve le persone da accoppiare, pulisce le loro strutture e
 crea gli individui figli */
 void accoppia(person* a, person* b) {
   add_func("accoppia");
@@ -306,7 +312,10 @@ void accoppia(person* a, person* b) {
   // termina le persone e pulisce le strutture
   termina_persona(a);
   termina_persona(b);
+  // calcola l'mcd
   unsigned long mcd_v = mcd(a->genoma,b->genoma);
+  // BIRTH_DEATH NON ESEGUIBILE
+  not = 1;
   // crea i nuovi individui
   person* new_1 = spawn_new_person(a->nome,mcd_v,a->sem);
   person* new_2 = spawn_new_person(b->nome,mcd_v,b->sem);
@@ -319,10 +328,14 @@ void accoppia(person* a, person* b) {
   // Segnala di iniziare il ciclo di vita
   segnala_start(new_1);
   segnala_start(new_2);
+  // Ora birth_death puo' essere eseguito
+  not = 0;
   rm_func();
 }
 
+
 void termina_persona(person* p) {
+  add_func("termina_persona");
   int pid = p->pid;
   // manda il segnale
   kill(pid,SIGTERM);
@@ -340,6 +353,7 @@ void termina_persona(person* p) {
   empty_queue(p);
   // risetta il semaforo di start a 1 per il prossimo processo
   set_one(sem_start,p->sem,1);
+  rm_func();
 }
 
 
@@ -401,7 +415,7 @@ void wait_for_messages() {
     // Riceve il messaggio del processo B con IPC_NOWAIT
     while (msgrcv(msq_match,&b_mess,msgsize,a_mess.partner,IPC_NOWAIT) == -1 && errno == EINTR) continue;
     // Il messaggio e' stato ricevuto
-    //controlla la validita' dei messaggi
+    // controlla la validita' dei messaggi
     if (a_mess.pid != b_mess.partner || b_mess.pid != a_mess.partner) {
       debug(0);
     }
@@ -411,7 +425,6 @@ void wait_for_messages() {
     if ((a_alive = kill(a_mess.pid,0)) == -1 || (b_alive = kill(b_mess.pid,0)) == -1) { // uno e' terminato
       // Uno dei due processi e' stato ucciso da birth_death
       // Restarta il processo in pausa.
-      printf("Uno dei processi e' terminato\n");
       if (a_alive == -1) {
         segnala_start(b);
       } else {
@@ -432,8 +445,13 @@ void wait_for_messages() {
 /* Termina un processo e ne crea uno nuovo ogni BIRTH_DEATH secondi */
 void birth_death(int sig) {
   add_func("birth_death");
-  double tempo_rimanente = SIM_TIME - elapsed_time();
-  if (tempo_rimanente <= BIRTH_DEATH) { // Cambia l'handler di SIGALRM per terminare
+  // Stampa le informazioni della simulazione
+  print_info();
+  // Calcola il tempo rimanente
+  double _time = elapsed_time();
+  double tempo_rimanente = SIM_TIME - _time;
+  if (tempo_rimanente <= BIRTH_DEATH) {
+    // Cambia l'handler di SIGALRM per terminare
     struct sigaction sa;
     sa.sa_handler = quit;
     sigfillset(&sa.sa_mask);
@@ -445,42 +463,21 @@ void birth_death(int sig) {
     timer.it_interval.tv_sec = 0;
     timer.it_interval.tv_usec = 0;
   }
-  if (a_people->length+b_people->length == 2) {
-    printf("Birth Death not possible!\n");
+  if (a_people->length+b_people->length == 2 || not) {
+    //printf("Birth Death not possible!\n");
+    rm_func();
     return;
   }
   // sceglie una vittima
-  // person* victim;
-  // while ((victim = choose_victim()) == NULL) continue;
-  // printf("Victim:\n");
-  // print_person(victim);
-  // pid_t pid = victim->pid;
-  // // manda il segnale di terminazione al processo
-  // if (kill(pid, SIGTERM) == -1) {
-  //   raise(SIGTERM);
-  // }
-  // if (victim->tipo == A) {
-  //   // rimuove la persona dalla memoria condivisa
-  //   shm_pop(shmptr,pid);
-  //   // rimuove la persona dalla lista di persone di quel tipo
-  //   pop_person(a_people,pid);
-  // } else {
-  //   pop_person(b_people,pid);
-  // }
-  // // esegue la wait
-  // waitpid(pid,NULL,0);
-  // // gestisce i messaggi e il matching
-  // end_match(victim);
-  // empty_queue(victim);
-  // // Crea un nuovo individuo
-  // person* new = spawn_new_person(NULL,0,victim->sem);
-  // // Attende che il processo sia pronto
-  // wait_ready(new);
-  // // Segnala di iniziare
-  // segnala_start(new);
-  // printf("New %d\n",new->pid);
-  // Stampa le informazioni della simulazione
-  print_info();
+  person* victim = choose_victim();
+  // la termina e pulisce le strutture
+  termina_persona(victim);
+  // Crea un nuovo individuo
+  person* new = spawn_new_person(NULL,0,victim->sem);
+  // Attende che il processo sia pronto
+  wait_ready(new);
+  // Segnala di iniziare
+  segnala_start(new);
   rm_func();
 }
 
@@ -506,7 +503,7 @@ void segnala_start(person* p) {
   rm_func();
 }
 
-/* Riceve il messaggio di pronto della persona p */
+/* Attende che la persona p sia pronta ad iniziare il ciclo di vita */
 void wait_ready(person* p) {
   add_func("wait_ready");
   wait_start(p->sem);
@@ -599,7 +596,6 @@ void quit(int sig) {
   shm_destroy();
   // cancella le code di messaggi
   msgctl(msq_match,IPC_RMID,NULL);
-  msgctl(msq_start,IPC_RMID,NULL);
   msgctl(msq_contact,IPC_RMID,NULL);
   // cancella i semafori
   sem_destroy();
