@@ -6,6 +6,8 @@
 #include "header.h"
 #include "people.h"
 
+extern person* best_genoma;
+extern person* longest_name;
 extern unsigned long GENES;
 extern char* stack[];
 extern int stack_length;
@@ -201,8 +203,10 @@ void delete_people(people* l) {
 /* Libera la memoria della persona */
 void delete_person(person* p) {
   add_func("delete_person");
-  free(p->nome);
-  free(p);
+  if (p != best_genoma && p != longest_name) {
+    free(p->nome);
+    free(p);
+  }
   rm_func();
 }
 

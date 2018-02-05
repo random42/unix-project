@@ -34,8 +34,16 @@ pid_t b_matching;
 message a_mess;
 message b_mess;
 
+// Timer per birth_death
+struct itimerval timer;
+
 // Persone totali create
 unsigned int total;
+unsigned int total_a;
+unsigned int total_b;
+// Persone con genoma maggiore e nome piu' lungo
+person* best_genoma;
+person* longest_name;
 // Accoppiamenti totali
 unsigned int matches;
 // Percorsi agli eseguibili di A e B
@@ -131,9 +139,8 @@ double elapsed_time() {
 
 
 /* Stampa le info della simulazione */
-void print_info(int sig) {
+void print_info() {
   add_func("print_info");
-  //add_func("print_info");
   double _time = elapsed_time();
   //printf("\n\n###  TIPO A  ###\n\n");
   //print_people(a_people);
@@ -144,6 +151,20 @@ void print_info(int sig) {
   printf("Tempo trascorso: %lf sec\n",_time);
   printf("Accoppiamenti/secondo: %.3lf\n",matches/_time);
   rm_func();
+}
+
+void print_final_info() {
+  print_info();
+  printf("Individui A creati: %u\n",total_a);
+  printf("Individui B creati: %u\n",total_b);
+  if (best_genoma) {
+    printf("\nPersona con genoma maggiore:\n");
+    printf("TIPO: %s\nID: %u\nPID: %d\nGENOMA: %lu\nNOME: %s\n",best_genoma->tipo == A ? "A" : "B",best_genoma->id,best_genoma->pid,best_genoma->genoma,best_genoma->nome);
+  }
+  if (longest_name) {
+    printf("\nPersona con nome piu' lungo:\n");
+    printf("TIPO: %s\nID: %u\nPID: %d\nGENOMA: %lu\nNOME: %s\n",longest_name->tipo == A ? "A" : "B",longest_name->id,longest_name->pid,longest_name->genoma,longest_name->nome);
+  }
 }
 
 
@@ -157,7 +178,7 @@ person* choose_victim() {
   node* n = a_people->first;
   person* p;
   // Un minimo iniziale maggiore di tutti i genomi
-  unsigned long min = GENES*2;
+  unsigned long min = GENES*GENES;
   for (int i = 0;i < a_people->length;i++) {
     if (n->elem->genoma < min && n->elem->pid != a_matching) {
       p = n->elem;
@@ -203,10 +224,31 @@ person* spawn_new_person(char* nome, unsigned long mcd) {
   } else {
     p = create_rand_person(type);
   }
-  // inizializza l'id
-  p->id = total++;
   // genera il processo
   gen_child(p);
+  // cambia best_genoma o longest_name se necessario
+  if (total == 0) {
+    best_genoma = p;
+    longest_name = p;
+  }
+  if (strlen(p->nome) > strlen(longest_name->nome)) {
+    longest_name = p;
+  }
+  if (p->genoma > best_genoma->genoma) {
+    best_genoma = p;
+  }
+  // inizializza l'id
+  p->id = total++;
+  // Aggiungo il nuovo processo alla rispettiva lista di persone
+  if (p->tipo == A) {
+    total_a++;
+    push_person(a_people,p);
+    // Aggiungo le informazioni nella memoria condivisa se il tipo e' A
+    shm_push(shmptr,p);
+  } else {
+    total_b++;
+    push_person(b_people,p);
+  }
   rm_func();
   return p;
 }
@@ -241,14 +283,6 @@ void gen_child(person* p) {
     }
     default: { // padre
       p->pid = child;
-      // Aggiungo il nuovo processo alla rispettiva lista di persone
-      if (p->tipo == A) {
-        push_person(a_people,p);
-        // Aggiungo le informazioni nella memoria condivisa se il tipo e' A
-        shm_push(shmptr,p);
-      } else {
-        push_person(b_people,p);
-      }
     }
   }
   rm_func();
@@ -388,8 +422,19 @@ void wait_for_messages() {
 /* Termina un processo e ne crea uno nuovo ogni BIRTH_DEATH secondi */
 void birth_death(int sig) {
   add_func("birth_death");
-  // resetta il segnale SIGALRM
-  alarm(BIRTH_DEATH);
+  double tempo_rimanente = SIM_TIME - elapsed_time();
+  if (tempo_rimanente <= BIRTH_DEATH) { // Cambia l'handler di SIGALRM per terminare
+    struct sigaction sa;
+    sa.sa_handler = quit;
+    sigfillset(&sa.sa_mask);
+    sigaction(SIGALRM,&sa,NULL);
+    // imposta il timer per finire nel momento corretto
+    timer.it_value.tv_sec = (int)tempo_rimanente;
+    timer.it_value.tv_usec = (tempo_rimanente-(int)tempo_rimanente)*1e6;
+    // disabilita ulteriori timer, superfluo
+    timer.it_interval.tv_sec = 0;
+    timer.it_interval.tv_usec = 0;
+  }
   // if (a_people->length+b_people->length == 2) {
   //   printf("Birth Death not possible!\n");
   //   return;
@@ -428,7 +473,7 @@ void birth_death(int sig) {
   // segnala_start(new);
   // printf("New %d\n",new->pid);
   // // Stampa le informazioni della simulazione
-  print_info(0);
+  // print_info();
   rm_func();
 }
 
@@ -525,6 +570,8 @@ void set_signals() {
 /* Inizia la simulazione */
 void start() {
   add_func("start");
+  // imposta il timer per birth_death
+  setitimer(ITIMER_REAL,&timer,NULL);
   // Crea le prime persone
   for (int i = 0;i < INIT_PEOPLE;i++) {
     spawn_new_person(NULL,0);
@@ -535,7 +582,6 @@ void start() {
   // Inizia il ciclo di vita
   people_for_each(a_people,segnala_start);
   people_for_each(b_people,segnala_start);
-  birth_death(0);
   // Attende i messaggi di accoppiamento
   wait_for_messages();
   rm_func();
@@ -544,8 +590,8 @@ void start() {
 /* Handler dei segnali di terminazione.
 Uccide i figli, cancella le strutture IPC e stampa le informazioni finali */
 void quit(int sig) {
+  print_final_info();
   kill_all();
-  //print_info(0);
   // cancella la memoria condivisa
   shm_destroy();
   // cancella le code di messaggi
@@ -567,36 +613,25 @@ void init() {
   }
   add_func("init");
   // gestione segnali
-  debug_info = 1;
   set_signals();
-  debug_info = 2;
-  // Inizializza le variabili a 0
-  a_matching = 0;
-  b_matching = 0;
-  total = 0;
-  matches = 0;
   // Definisce il tempo iniziale
   gettimeofday(&start_time,NULL);
-  debug_info = 3;
+  // Imposta il timer
+  timer.it_value.tv_sec = BIRTH_DEATH;
+  timer.it_interval.tv_sec = BIRTH_DEATH;
   // Apre il file urandom
   urandom = fopen("/dev/urandom", "r");
-  debug_info = 4;
   // Crea le code di messaggi
   msq_init();
-  debug_info = 5;
   msgsize = sizeof(message)-sizeof(long);
   // Inizializza la memoria condivisa
   shm_init();
-  debug_info = 6;
   // Definisce i percorsi degli eseguibili
   char* dir = getenv("PWD");
-  debug_info = 7;
   a_path = malloc(strlen(dir)+6);
   b_path = malloc(strlen(dir)+6);
-  debug_info = 8;
   sprintf(a_path,"%s/bin/a",dir);
   sprintf(b_path,"%s/bin/b",dir);
-  debug_info = 9;
   // Inizializza le liste di persone
   a_people = init_people();
   b_people = init_people();
@@ -607,9 +642,7 @@ int main(int argc, char* argv[]) {
   INIT_PEOPLE = strtoul(argv[1],NULL,10);
   GENES = strtoul(argv[2],NULL,10);
   BIRTH_DEATH = strtoul(argv[3],NULL,10);
-  if (argc > 4) {
-    SIM_TIME = strtoul(argv[4],NULL,10);
-  }
+  SIM_TIME = strtoul(argv[4],NULL,10);
   init();
   start();
 }

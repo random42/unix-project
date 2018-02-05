@@ -177,7 +177,6 @@ void quit(int sig) {
 
 void start() {
   add_func("start");
-  alarm(5);
   cerca();
   rm_func();
 }

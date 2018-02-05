@@ -68,7 +68,6 @@ void set_signals(void(quit)(int),void(debug)(int)) {
   sigemptyset(&sig_do_nothing.sa_mask);
   // Setta gli handler dei segnali
   sigaction(SIGTERM,&sig_term,NULL);
-  sigaction(SIGALRM,&sig_debug,NULL);
   sigaction(SIGUSR1,&sig_do_nothing,NULL);
   sigaction(SIGUSR2,&sig_debug,NULL);
   sigaction(SIGSEGV,&sig_debug,NULL);

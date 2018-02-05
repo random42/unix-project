@@ -152,7 +152,6 @@ void quit(int sig) {
 
 void start() {
   add_func("start");
-  alarm(5);
   ascolta();
   rm_func();
 }
