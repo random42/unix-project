@@ -147,12 +147,16 @@ void init() {
 }
 
 void quit(int sig) {
+  signal(SIGTERM,quit);
+  printf("%d\n",getpid());
   if (sig == SIGTERM) { // manda il messaggio per end_match()
     message m;
     m.mtype = getpid();
     m.data = match_phase;
     m.partner = partner;
+    printf("Pid: %d\tmtype: %lu\tpartner: %d\tdata: %d\n",m.pid,m.mtype,m.partner,m.data);
     msgsnd(msq_start,&m,msgsize,0);
+    if (match_phase) {return;}
   }
   exit(EXIT_SUCCESS);
 }

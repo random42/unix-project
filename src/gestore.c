@@ -175,24 +175,27 @@ person* choose_victim() {
   if (a_people->length + b_people->length == 2) {
     return NULL;
   }
-  node* n = a_people->first;
+  int length = a_people->length + b_people->length;
+  int index;
+  fread(&index, sizeof(int), 1, urandom);
+  index = index % length;
   person* p;
-  // Un minimo iniziale maggiore di tutti i genomi
-  unsigned long min = GENES*GENES;
-  for (int i = 0;i < a_people->length;i++) {
-    if (n->elem->genoma < min && n->elem->pid != a_matching) {
-      p = n->elem;
-      min = p->genoma;
+  node* n;
+  if (index >= a_people->length) {
+    index -= a_people->length;
+    n = b_people->first;
+    for (int i = 0;i < index;i++) {
+      n = n->next;
     }
-    n = n->next;
+  } else { // su A
+    n = a_people->first;
+    for (int i = 0;i < index;i++) {
+      n = n->next;
+    }
   }
-  n = b_people->first;
-  for (int i = 0;i < b_people->length;i++) {
-    if (n->elem->genoma < min && n->elem->pid != b_matching) {
-      p = n->elem;
-      min = p->genoma;
-    }
-    n = n->next;
+  p = n->elem;
+  if (p->pid == a_matching || p->pid == b_matching) {
+    return choose_victim();
   }
   rm_func();
   return p;
@@ -342,6 +345,7 @@ void end_match(person* p) {
   while (msgrcv(msq_start,&r,msgsize,p->pid,0) == -1 && errno == EINTR) continue;
   int partner = r.partner;
   int match_phase = r.data;
+  //printf("match phase %d\n",match_phase);
   if (p->tipo == A) { // caso A
     s.data = 0;
     switch (match_phase) {
@@ -498,7 +502,16 @@ void birth_death(int sig) {
   }
   // sceglie una vittima
   person* victim;
-  while ((victim = choose_victim()) == NULL) continue;
+  int good = 0;
+  while ((victim = choose_victim()) && !good) {
+    debug_info = 10;
+    kill(SIGTERM,victim->pid);
+    printf("b_d %d\n",victim->pid);
+    message x;
+    while (msgrcv(msq_start,&x,msgsize,victim->pid,0) == -1 && errno == EINTR) continue;
+    printf("match_phase = %d\n",x.data);
+  }
+  debug_info = 11;
   printf("Victim:\n");
   print_person(victim);
   pid_t pid = victim->pid;
@@ -517,7 +530,7 @@ void birth_death(int sig) {
   // esegue la wait
   waitpid(pid,NULL,0);
   // gestisce i messaggi e il matching
-  end_match(victim);
+  //end_match(victim);
   empty_queue(victim);
   // Crea un nuovo individuo
   person* new = spawn_new_person(NULL,0);
@@ -699,4 +712,5 @@ int main(int argc, char* argv[]) {
   SIM_TIME = strtoul(argv[4],NULL,10);
   init();
   start();
+  quit(0);
 }

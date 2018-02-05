@@ -67,13 +67,31 @@ void set_signals(void(quit)(int),void(debug)(int)) {
   // Handler interrompibile
   sigemptyset(&sig_do_nothing.sa_mask);
   // Setta gli handler dei segnali
-  sigaction(SIGTERM,&sig_term,NULL);
-  sigaction(SIGUSR1,&sig_do_nothing,NULL);
-  sigaction(SIGUSR2,&sig_debug,NULL);
-  sigaction(SIGSEGV,&sig_debug,NULL);
-  sigaction(SIGABRT,&sig_debug,NULL);
-  sigaction(SIGILL,&sig_debug,NULL);
-  sigaction(SIGINT,&sig_ignore,NULL);
+  signal(SIGTERM,quit);
+  if (sigaction(SIGUSR1,&sig_do_nothing,NULL) == -1) {
+    printf("SIGUSR1 sigaction failed\n");
+    quit(0);
+  }
+  if (sigaction(SIGUSR2,&sig_debug,NULL) == -1) {
+    printf("SIGUSR2 sigaction failed\n");
+    quit(0);
+  }
+  if (sigaction(SIGSEGV,&sig_debug,NULL) == -1) {
+    printf("SIGSEGV sigaction failed\n");
+    quit(0);
+  }
+  if (sigaction(SIGABRT,&sig_debug,NULL) == -1) {
+    printf("SIGABRT sigaction failed\n");
+    quit(0);
+  }
+  if (sigaction(SIGILL,&sig_debug,NULL) == -1) {
+    printf("SIGILL sigaction failed\n");
+    quit(0);
+  }
+  if (sigaction(SIGINT,&sig_ignore,NULL) == -1) {
+    printf("SIGINT sigaction failed\n");
+    quit(0);
+  }
   rm_func();
 }
 

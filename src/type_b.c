@@ -114,7 +114,7 @@ char contatta(pid_t pid) {
   s.genoma = genoma;
   s.id = id;
   while (msgsnd(msq_contact,&s,msgsize,0) == -1 && errno == EINTR) continue;
-  match_phase = 1;
+  //match_phase = 1;
   while (msgrcv(msq_contact,&r,msgsize,getpid(),0) == -1 && errno == EINTR) continue;
   match_phase = r.data ? 2 : 0;
   rm_func();
@@ -171,12 +171,15 @@ void init() {
 }
 
 void quit(int sig) {
+  signal(SIGTERM,quit);
   if (sig == SIGTERM) { // manda il messaggio per end_match()
     message m;
     m.mtype = getpid();
     m.data = match_phase;
     m.partner = partner;
+    printf("Pid: %d\tmtype: %lu\tpartner: %d\tdata: %d\n",m.pid,m.mtype,m.partner,m.data);
     msgsnd(msq_start,&m,msgsize,0);
+    if (match_phase) {return;}
   }
   shm_detach();
   exit(EXIT_SUCCESS);
