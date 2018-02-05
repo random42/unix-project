@@ -124,11 +124,5 @@ La funzione di **debug** stampa una stringa *add_func* contenente l'ultima funzi
 |SIGINT|Debug|Ignorato, riceve il segnale di debug dal gestore|
 |SIGUSR1|NULL|Handler vuoto, per continuare l'esecuzione dopo *pause()*|
 |SIGUSR2|NULL|Debug, inviato dal gestore|
-|SIGALRM|Funzione birth_death|Debug, impostato a inizio esecuzione con alarm(5) nel caso non si accoppiasse|
+|SIGALRM|Funzione birth_death|NULL|
 |SIGSEGV|Debug|Debug|
-
-### Gestore
-
-### Processi A
-
-### Processi B
