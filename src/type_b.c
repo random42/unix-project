@@ -171,6 +171,13 @@ void init() {
 }
 
 void quit(int sig) {
+  if (sig == SIGTERM) { // manda il messaggio per end_match()
+    message m;
+    m.mtype = getpid();
+    m.data = match_phase;
+    m.partner = partner;
+    msgsnd(msq_start,&m,msgsize,0);
+  }
   shm_detach();
   exit(EXIT_SUCCESS);
 }

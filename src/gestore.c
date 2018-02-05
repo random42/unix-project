@@ -308,6 +308,9 @@ void accoppia(int a, int b) {
   // svuota i messaggi
   empty_queue(old_a);
   empty_queue(old_b);
+  // in questo contesto serve solamente a prelevare il messaggio di terminazione
+  end_match(old_a);
+  end_match(old_b);
   unsigned long mcd_v = mcd(old_a->genoma,old_b->genoma);
   // le rimuove dalla lista
   pop_person(a_people,a);
@@ -330,6 +333,67 @@ void accoppia(int a, int b) {
   rm_func();
 }
 
+/* Gestisce i match incompleti a causa di birth_death */
+void end_match(person* p) {
+  add_func("end_match");
+  // riceve il messaggio con la fase di match e il partner
+  message r;
+  message s;
+  while (msgrcv(msq_start,&r,msgsize,p->pid,0) == -1 && errno == EINTR) continue;
+  int partner = r.partner;
+  int match_phase = r.data;
+  if (p->tipo == A) { // caso A
+    s.data = 0;
+    switch (match_phase) {
+      case 1: { // deve ancora rispondere al contatto di B
+        printf("A fase 1\n");
+        s.data = 0;
+        s.mtype = partner;
+        while (msgsnd(msq_contact,&s,msgsize,0) == -1 && errno == EINTR) continue;
+        break;
+      }
+      case 2: {  // Deve attendere la conferma di B e segnalare a B di continuare
+        printf("A fase 2\n");
+        // riceve il messaggio di conferma
+        while (msgrcv(msq_match,&r,msgsize,p->pid,0) == -1 && errno == EINTR) continue;
+        // preleva il messaggio che B ha mandato al gestore
+        while (msgrcv(msq_match,&r,msgsize,partner,IPC_NOWAIT) == -1 && errno == EINTR) continue;
+        // segnala a B di continuare
+        kill(partner,SIGUSR1);
+        break;
+      }
+      case 3: {  // Deve segnalare a B di continuare
+        printf("A fase 3\n");
+        // preleva il messaggio che B ha mandato al gestore
+        while (msgrcv(msq_match,&r,msgsize,partner,IPC_NOWAIT) == -1 && errno == EINTR) continue;
+        // segnala a B di continuare
+        kill(partner,SIGUSR1);
+        break;
+      }
+    }
+  }
+  else {  // caso B
+    s.data = 0;
+    s.mtype = partner;
+    switch (match_phase) {
+      case 1: { // ha contattato A
+        printf("B case 1\n");
+        // Riceve il messaggio di assenso/rifiuto
+        while (msgrcv(msq_contact,&r,msgsize,p->pid,0) == -1 && errno == EINTR) continue;
+        if (!r.data) { // A non ha accettato
+          break;
+        }
+        // se ha accettato passa al caso 2
+      }
+      case 2: { // A ha accettato, non conferma il match
+        printf("B case 2\n");
+        while (msgsnd(msq_match,&s,msgsize,0) == -1 && errno == EINTR) continue;
+        break;
+      }
+    }
+  }
+  rm_func();
+}
 
 /* Svuota i messaggi contact di un processo terminato.
 Se di tipo A, rifiuta tutte le richieste pendenti
@@ -374,12 +438,9 @@ void print_message(message* m) {
 }
 
 
-/* Attende messaggi di accoppiamento. Vengono usati i while nel caso
-in cui un segnale blocchi la ricezione del messaggio */
+/* Attende messaggi di accoppiamento */
 void wait_for_messages() {
   add_func("wait_for_messages");
-  int max_match = 1000;
-  int i = 0;
   while (1) {
     // Riceve il messaggio di un processo A
     while (msgrcv(msq_match,&a_mess,msgsize,getpid(),0) == -1 && errno == EINTR) continue;
@@ -387,10 +448,7 @@ void wait_for_messages() {
     a_matching = a_mess.pid;
     b_matching = a_mess.partner;
     // Riceve il messaggio del processo B con IPC_NOWAIT
-    errno = 0;
-    while (msgrcv(msq_match,&b_mess,msgsize,a_mess.partner,IPC_NOWAIT) == -1 && errno == EINTR) {
-      errno = 0;
-    }
+    while (msgrcv(msq_match,&b_mess,msgsize,a_mess.partner,IPC_NOWAIT) == -1 && errno == EINTR) continue;
     // Il messaggio e' stato ricevuto
     //controlla la validita' dei messaggi
     if (a_mess.pid != b_mess.partner || b_mess.pid != a_mess.partner) {
@@ -413,7 +471,6 @@ void wait_for_messages() {
       // li accoppia
       accoppia(a_mess.pid,a_mess.partner);
     }
-    i++;
   }
   rm_func();
 }
@@ -435,45 +492,42 @@ void birth_death(int sig) {
     timer.it_interval.tv_sec = 0;
     timer.it_interval.tv_usec = 0;
   }
-  // if (a_people->length+b_people->length == 2) {
-  //   printf("Birth Death not possible!\n");
-  //   return;
-  // }
-  // // sceglie una vittima
-  // person* victim;
-  // while ((victim = choose_victim()) == NULL) continue;
-  // printf("Victim:\n");
-  // print_person(victim);
-  // pid_t pid = victim->pid;
-  // // manda il segnale di terminazione al processo
-  // if (kill(pid, SIGTERM) == -1) {
-  //   printf("Segnale di terminazione fallito!\n");
-  //   raise(SIGTERM);
-  // }
-  // empty_queue(victim);
-  // if (victim->tipo == A) {
-  //   // rimuove la persona dalla memoria condivisa
-  //   shm_pop(shmptr,pid);
-  //   // rimuove la persona dalla lista di persone di quel tipo
-  //   pop_person(a_people,pid);
-  // } else {
-  //   pop_person(b_people,pid);
-  // }
-  // // esegue la wait
-  // int status;
-  // waitpid(pid,&status,0);
-  // if (status != EXIT_SUCCESS) {
-  //   printf("%d did not exited with success.\n",pid);
-  // }
-  // // Crea un nuovo individuo
-  // person* new = spawn_new_person(NULL,0);
-  // // Attende che il processo sia pronto
-  // ready_receive(new);
-  // // Segnala di iniziare
-  // segnala_start(new);
-  // printf("New %d\n",new->pid);
-  // // Stampa le informazioni della simulazione
-  // print_info();
+  if (a_people->length+b_people->length == 2) {
+    printf("Birth Death not possible!\n");
+    return;
+  }
+  // sceglie una vittima
+  person* victim;
+  while ((victim = choose_victim()) == NULL) continue;
+  printf("Victim:\n");
+  print_person(victim);
+  pid_t pid = victim->pid;
+  // manda il segnale di terminazione al processo
+  if (kill(pid, SIGTERM) == -1) {
+    raise(SIGTERM);
+  }
+  if (victim->tipo == A) {
+    // rimuove la persona dalla memoria condivisa
+    shm_pop(shmptr,pid);
+    // rimuove la persona dalla lista di persone di quel tipo
+    pop_person(a_people,pid);
+  } else {
+    pop_person(b_people,pid);
+  }
+  // esegue la wait
+  waitpid(pid,NULL,0);
+  // gestisce i messaggi e il matching
+  end_match(victim);
+  empty_queue(victim);
+  // Crea un nuovo individuo
+  person* new = spawn_new_person(NULL,0);
+  // Attende che il processo sia pronto
+  ready_receive(new);
+  // Segnala di iniziare
+  segnala_start(new);
+  printf("New %d\n",new->pid);
+  // Stampa le informazioni della simulazione
+  print_info();
   rm_func();
 }
 
