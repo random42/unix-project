@@ -648,5 +648,5 @@ int main(int argc, char* argv[]) {
   SIM_TIME = strtoul(argv[4],NULL,10);
   init();
   start();
-  quit(0);
+  //quit(0);
 }
