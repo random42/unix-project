@@ -7,5 +7,6 @@ void set_signals();
 void msq_init();
 void ready();
 void do_nothing(int sig);
+void fine_match();
 
 #endif

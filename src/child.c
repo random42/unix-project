@@ -7,11 +7,17 @@
 #include <errno.h>
 #include "header.h"
 #include "child.h"
+#include "sem.h"
 
 extern int msq_match;
 extern int msq_start;
 extern int msq_contact;
 extern int msgsize;
+
+extern short sem_num;
+
+extern int sem_start;
+extern int sem_match;
 
 extern char* stack[];
 extern int stack_length;
@@ -77,6 +83,15 @@ void set_signals(void(quit)(int),void(debug)(int)) {
   rm_func();
 }
 
+void fine_match() {
+  add_func("fine_match");
+  // segnalano di aver finito il match
+  add_match(sem_num,-1);
+  // riprendono l'esecuzione se il gestore aumenta il semaforo
+  add_start(sem_num,-1);
+  rm_func();
+}
+
 void msq_init() {
   add_func("msq_init");
   msgsize = sizeof(message)-sizeof(unsigned long);
@@ -94,9 +109,7 @@ void msq_init() {
 
 void ready() {
   add_func("ready");
-  message m;
-  m.mtype = getpid();
-  while (msgsnd(msq_start,&m,msgsize,0) == -1 && errno == EINTR) continue;
-  pause();
+  add_start(sem_num,-1);
+  add_start(sem_num,-1);
   rm_func();
 }

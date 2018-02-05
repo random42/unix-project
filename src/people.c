@@ -31,26 +31,19 @@ type == 1 -> B
 default -> random */
 person* create_person(char* name, unsigned long mcd, int type) {
   add_func("create_person");
-  debug_info = 1;
   int name_length = strlen(name)+1;
   // alloca la memoria per la nuova persona
-  debug_info = 2;
   person* r = malloc(sizeof(person));
-  debug_info = 3;
   r->nome = malloc(name_length+1);
-  debug_info = 4;
   // copia il nome del genitore
   strcpy(r->nome,name);
-  debug_info = 5;
   unsigned short n;
   fread(&n,sizeof(unsigned short),1,urandom);
-  debug_info = 6;
   // inserisce una nuova lettera random nel nome
   r->nome[name_length-1] = (n % 26) + 65;
   r->nome[name_length] = '\0';
   unsigned long gen;
   fread(&gen,sizeof(unsigned long),1,urandom);
-  debug_info = 7;
   // genera il genoma
   r->genoma = (gen % GENES+1) + mcd;
   // definisce il tipo
@@ -109,7 +102,7 @@ void people_for_each(people* arr, void (*f)(person*)) {
 /* Stampa le informazioni di una persona */
 void print_person(person* p) {
   add_func("print_person");
-  printf("%d\t%s\t%lu\t%d\n",p->id,(p->tipo == 0 ? "A":"B"),p->genoma,p->pid);
+  printf("%d\t%s\t%lu\t%d\t%hi\n",p->id,(p->tipo == 0 ? "A":"B"),p->genoma,p->pid,p->sem);
   rm_func();
 }
 
@@ -117,7 +110,7 @@ void print_person(person* p) {
 /* Stampa le informazioni di una lista di persone */
 void print_people(people* arr) {
   add_func("print_person");
-  printf("ID\tTIPO\tGENOMA\tPID\n\n");
+  printf("ID\tTIPO\tGENOMA\tPID\tSEM\n\n");
   people_for_each(arr,print_person);
   printf("\n");
   rm_func();

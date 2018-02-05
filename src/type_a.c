@@ -14,8 +14,10 @@
 
 
 // Proprie caratteristiche
+unsigned int id;
 unsigned long genoma;
 char* nome;
+short sem_num;
 
 unsigned int INIT_PEOPLE;
 // pid del partner accoppiato
@@ -88,8 +90,7 @@ void accetta(pid_t pid) {
   } else { // B e' stato ucciso quindi il gestore ha risposto al suo posto
     printf("A %d B ucciso\n",getpid());
   }
-  match_phase = 0;
-  pause();
+  fine_match();
   printf("A %d riprende esecuzione\n",getpid());
   rm_func();
 }
@@ -111,22 +112,23 @@ void ascolta() {
   while (1) {
     // ricevo il messaggio
     while (msgrcv(msq_contact,&r,msgsize,getpid(),0) == -1 && errno == EINTR) continue;
+    add_match(sem_num,1);
     partner = r.pid;
     match_phase = 1;
     if (mcd(genoma,r.genoma) >= target) { // l'mcd corrisponde al target
       accetta(r.pid);
     } else {
       rifiuta(r.pid);
+      add_match(sem_num,-1);
       push_contact(r.id);
     }
-    match_phase = 0;
   }
   rm_func();
 }
 
 void debug(int sig) {
   printf("\n%s ",strsignal(sig));
-  printf("%d {type: A, info: %d, target: %lu, genoma: %lu, partner: %d stack: [",getpid(),debug_info,target,genoma,partner);
+  printf("%d {type: A, info: %d, target: %lu, genoma: %lu, partner: %d, sem: %hi, stack: [",getpid(),debug_info,target,genoma,partner,sem_num);
   for (int i = 0; i < stack_length;i++) {
     printf("%s, ",stack[i]);
   }
@@ -141,6 +143,7 @@ void init() {
   }
   add_func("init");
   set_signals(quit,debug);
+  sem_init();
   // le code di messaggi
   msq_init();
   // cerca i divisori
@@ -151,13 +154,6 @@ void init() {
 }
 
 void quit(int sig) {
-  if (sig == SIGTERM) { // manda il messaggio per end_match()
-    message m;
-    m.mtype = getpid();
-    m.data = match_phase;
-    m.partner = partner;
-    msgsnd(msq_start,&m,msgsize,0);
-  }
   exit(EXIT_SUCCESS);
 }
 
@@ -170,7 +166,9 @@ void start() {
 int main(int argc, char* argv[]) {
   nome = argv[1];
   genoma = strtoul(argv[2],NULL,10);
-  INIT_PEOPLE = strtoul(argv[3],NULL,10);
+  id = strtoul(argv[3],NULL,10);
+  sem_num = strtoul(argv[4],NULL,10);
+  INIT_PEOPLE = strtoul(argv[5],NULL,10);
   init();
   // Segnala al gestore di essere pronto e attende lo start
   ready();

@@ -18,6 +18,7 @@
 unsigned long genoma;
 char* nome;
 unsigned int id;
+short sem_num;
 
 unsigned int INIT_PEOPLE;
 
@@ -101,10 +102,7 @@ void accoppia(pid_t pid) {
   s.mtype = pid;
   s.data = 1;
   while (msgsnd(msq_match,&s,msgsize,0) == -1 && errno == EINTR) continue;
-  match_phase = 0;
-  // Attende il segnale di terminazione
-  pause();
-  partner = 0;
+  fine_match();
   printf("B %d riprende esecuzione\n",getpid());
   rm_func();
 }
@@ -118,9 +116,8 @@ char contatta(pid_t pid) {
   s.genoma = genoma;
   s.id = id;
   while (msgsnd(msq_contact,&s,msgsize,0) == -1 && errno == EINTR) continue;
-  match_phase = 1;
+  add_match(sem_num,1);
   while (msgrcv(msq_contact,&r,msgsize,getpid(),0) == -1 && errno == EINTR) continue;
-  match_phase = r.data ? 2 : 0;
   rm_func();
   return r.data;
 }
@@ -134,6 +131,7 @@ void cerca_target() {
     if (a[i].valid && mcd(genoma,a[i].genoma) >= target && not_black_list(a[i].id)) {
       partner = a[i].pid;
       if (!contatta(partner)) { // se viene rifiutato aggiunge il processo A nella black_list
+        add_match(sem_num,-1);
         black_list[black_list_length++] = a[i].id;
       } else { // altrimenti si accoppia
         accoppia(a[i].pid);
@@ -165,6 +163,7 @@ void init() {
   add_func("init");
   black_list = malloc(sizeof(int)*INIT_PEOPLE);
   set_signals(quit,debug);
+  sem_init();
   // le code di messaggi
   msq_init();
   // la memoria condivisa
@@ -175,13 +174,6 @@ void init() {
 }
 
 void quit(int sig) {
-  if (sig == SIGTERM) { // manda il messaggio per end_match()
-    message m;
-    m.mtype = getpid();
-    m.data = match_phase;
-    m.partner = partner;
-    msgsnd(msq_start,&m,msgsize,0);
-  }
   shm_detach();
   exit(EXIT_SUCCESS);
 }
@@ -194,7 +186,7 @@ void start() {
 
 void debug(int sig) {
   printf("\n%s ",strsignal(sig));
-  printf("%d {type: B, info: %d, target: %lu, genoma: %lu, partner: %d stack: [",getpid(),debug_info,target,genoma,partner);
+  printf("%d {type: B, info: %d, target: %lu, genoma: %lu, partner: %d, sem: %hi, stack: [",getpid(),debug_info,target,genoma,partner,sem_num);
   for (int i = 0; i < stack_length;i++) {
     printf("%s, ",stack[i]);
   }
@@ -206,7 +198,8 @@ int main(int argc, char* argv[]) {
   nome = argv[1];
   genoma = strtoul(argv[2],NULL,10);
   id = strtoul(argv[3],NULL,10);
-  INIT_PEOPLE = strtoul(argv[4],NULL,10);
+  sem_num = strtoul(argv[4],NULL,10);
+  INIT_PEOPLE = strtoul(argv[5],NULL,10);
   init();
   // Segnala al gestore di essere pronto e attende lo start
   ready();

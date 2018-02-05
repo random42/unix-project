@@ -101,7 +101,7 @@ void print_sem_start() {
     print_error();
     raise(SIGTERM);
   }
-  printf("sem_match: {");
+  printf("sem_start: {");
   for (int i = 0;i < INIT_PEOPLE;i++) {
     printf("%d,",array[i]);
   }
@@ -109,28 +109,46 @@ void print_sem_start() {
   rm_func();
 }
 
-void set_match(short num, short op) {
-  add_func("set_match");
+void wait_match(short num) {
+  struct sembuf s;
+  s.sem_num = num;
+  s.sem_op = 0;
+  while (semop(sem_match,&s,1) == -1 && errno == EINTR) continue;
+}
+
+void wait_start(short num) {
+  struct sembuf s;
+  s.sem_num = num;
+  s.sem_op = 0;
+  while (semop(sem_start,&s,1) == -1 && errno == EINTR) continue;
+}
+
+void add_match(short num, short op) {
+  add_func("add_match");
   struct sembuf s;
   s.sem_num = num;
   s.sem_op = op;
-  if (semop(sem_match,&s,1) == -1) {
-    printf("set_match error\n");
-    print_error();
-    raise(SIGTERM);
-  }
+  while (semop(sem_match,&s,1) == -1 && errno == EINTR) continue;
   rm_func();
 }
 
-void set_start(short num, short op) {
-  add_func("set_start");
+void add_start(short num, short op) {
+  add_func("add_start");
   struct sembuf s;
   s.sem_num = num;
   s.sem_op = op;
-  if (semop(sem_match,&s,1) == -1) {
-    printf("set_match error\n");
-    print_error();
-    raise(SIGTERM);
-  }
+  while (semop(sem_start,&s,1) == -1 && errno == EINTR) continue;
   rm_func();
+}
+
+void set_all(int id, short num) {
+  unsigned short a[INIT_PEOPLE];
+  for (short i = 0;i < INIT_PEOPLE;i++) {
+    a[i] = num;
+  }
+  while (semctl(id,0,SETALL,a) == -1 && errno == EINTR) continue;
+}
+
+void set_one(int id, short sem, short num) {
+  while (semctl(id,sem,SETVAL,num) == -1 && errno == EINTR) continue;
 }

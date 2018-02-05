@@ -9,6 +9,7 @@ typedef struct {
   unsigned long genoma;
   char* nome;
   pid_t pid;
+  short sem;
 } person;
 
 typedef struct nodo {
