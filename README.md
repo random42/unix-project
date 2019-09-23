@@ -1,27 +1,26 @@
-# Unix Project
+# unix-tinder
+
 **University of Turin, Italy**
 
 **Computer Science Department**
 
 **Authors**: Roberto Sero, Gianmarco Sciortino
 
-## Come eseguire
+## How to run
 
-Clonare il progetto:
+Clone project:
 
-`$ git clone https://github.com/robertosero/unix-project`
+`git clone https://github.com/robertosero/unix-project`
 
-Compilare:
+Compile:
 
-`$ cd unix-project`
+`cd unix-project`
 
-`$ make all`
+`make`
 
-Eseguire /bin/gestore:
+Execute (always from project root):
 
-`$ ./bin/gestore <init_people> <genes> <birth_death> <sim_time>`
-
-***Importante!*** Eseguire il gestore sempre dalla root directory, non navigare in bin!
+`./bin/gestore <init_people> <genes> <birth_death> <sim_time>`
 
 
 ## Struttura e scelte progettuali
